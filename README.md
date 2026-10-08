@@ -21,7 +21,7 @@ No installation, no accounts, no ads — just open the HTML file in a browser an
 
 ## How to play
 
-1. Open `dino-times-tables.html` in any modern web browser.
+1. Open dino-times-tables.html in any modern web browser, or visit the live version at https://mtomtom.github.io/dino-timestables/
 2. Enter your name when Rex asks — this is stored locally in your browser only.
 3. Pick a game mode from the home screen.
 4. Select which times tables you want to practise.
