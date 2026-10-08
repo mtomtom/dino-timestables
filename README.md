@@ -55,14 +55,6 @@ Progress (name, Dino Bucks, skins, badges, stats, and streaks) is stored in your
 
 No data is ever sent over the internet. Everything stays on-device.
 
-## Hosting on GitHub Pages
-
-1. Create a public GitHub repository.
-2. Add `dino-times-tables.html` to the repository root. Optionally rename it to `index.html` so your Pages URL opens the game directly.
-3. Go to **Settings → Pages** in your repository and set the source to the `main` branch, root folder.
-4. GitHub will provide a URL in the format `https://yourusername.github.io/your-repo/`.
-5. Share that link — it works on any device with a modern browser.
-
 **Technical notes:**
 
 - Single file, no build step, no dependencies.
