@@ -1,0 +1,1056 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dino Times Tables</title>
+<style>
+:root{
+  --panel:rgba(14,22,30,.88);--panel2:rgba(255,255,255,.08);--line:rgba(255,255,255,.16);
+  --txt:#f4f7f2;--muted:#b9c4bd;--gold:#ffcc33;--good:#3ddc84;--bad:#ff5a5f;
+  --blue:#38a7ff;--purple:#9b5cff;--orange:#ff8a1f;--green:#4cc35a;
+  --fh:"Arial Black","Segoe UI Black",Impact,system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+body{background:#1d3b2a;color:var(--txt);font-family:"Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;font-size:17px;line-height:1.4;overflow-x:hidden}
+#scene{position:fixed;inset:0;z-index:0}
+#scene svg{width:100%;height:100%;display:block}
+#topbar{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:8px;padding:10px 16px;background:rgba(10,16,22,.78);backdrop-filter:blur(6px);flex-wrap:wrap}
+.logo{font-family:var(--fh);font-size:20px;cursor:pointer;margin-right:auto;user-select:none}
+.logo span{color:var(--gold)}
+.chip{background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:4px 12px;font-weight:700;white-space:nowrap;font-size:15px}
+.chip.btnish{cursor:pointer}
+main{position:relative;z-index:1;max-width:840px;margin:18px auto 40px;padding:0 16px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:22px;padding:22px;box-shadow:0 10px 40px rgba(0,0,0,.35);margin-bottom:16px}
+h1,h2,h3,.fh{font-family:var(--fh);font-weight:900;margin:0 0 .4em;line-height:1.15}
+h1{font-size:32px}h2{font-size:26px}h3{font-size:19px}
+p{margin:.3em 0 .8em}
+.muted{color:var(--muted)}
+.center{text-align:center}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+.grid3{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px}
+.btn{font-family:var(--fh);font-size:18px;color:#fff;background:var(--blue);border:0;border-bottom:6px solid rgba(0,0,0,.35);border-radius:14px;padding:12px 20px;cursor:pointer;transition:transform .08s,filter .15s;text-shadow:0 2px 0 rgba(0,0,0,.25)}
+.btn:hover{filter:brightness(1.1)}
+.btn:active{transform:translateY(3px);border-bottom-width:3px}
+.btn:disabled{filter:grayscale(1) brightness(.7);cursor:not-allowed}
+.btn.small{font-size:15px;padding:8px 14px;border-bottom-width:4px}
+.btn.green{background:var(--green)}.btn.gold{background:#e6a800}.btn.red{background:#e0484d}
+.btn.purple{background:var(--purple)}.btn.orange{background:var(--orange)}.btn.grey{background:#56616b}
+.btn.huge{font-size:26px;padding:20px 24px;width:100%}
+.btn .sub{display:block;font-family:"Segoe UI",system-ui,sans-serif;font-size:14px;font-weight:600;opacity:.9;text-shadow:none}
+.menu{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-top:14px}
+input[type=text],textarea{font:inherit;color:#111;background:#fff;border:3px solid #333;border-radius:12px;padding:10px 14px}
+textarea{width:100%;min-height:90px;font-family:Consolas,monospace;font-size:13px}
+/* Rex + speech */
+.hero{display:flex;align-items:flex-end;gap:14px}
+.rexbox{flex:0 0 auto;width:170px}
+.rexbox.sm{width:110px}
+.rexsvg{width:100%;height:auto;display:block;overflow:visible}
+.bubble{position:relative;background:#fff;color:#1b1b1b;border-radius:18px;padding:14px 16px;font-weight:600;flex:1;min-height:60px;margin-bottom:40px}
+.bubble:after{content:"";position:absolute;left:-14px;bottom:18px;border:10px solid transparent;border-right:16px solid #fff;border-left:0}
+.bubble .ans{color:#0b7a3b;font-weight:800;cursor:pointer}
+.bounce{animation:bounce .5s}
+.shake{animation:shake .45s}
+.hitflash{animation:hitflash .45s}
+@keyframes bounce{0%,100%{transform:translateY(0)}35%{transform:translateY(-22px)}65%{transform:translateY(0)}80%{transform:translateY(-6px)}}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-10px)}40%{transform:translateX(10px)}60%{transform:translateX(-7px)}80%{transform:translateX(7px)}}
+@keyframes hitflash{0%,100%{filter:none}30%{filter:brightness(2.2) saturate(0)}60%{filter:none;transform:translateX(8px)}}
+@keyframes idle{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+.idle{animation:idle 2.4s ease-in-out infinite}
+/* progress */
+.bar{height:16px;background:rgba(255,255,255,.12);border-radius:99px;overflow:hidden;border:1px solid var(--line)}
+.bar>i{display:block;height:100%;background:linear-gradient(90deg,#ffd54f,#ff9800);border-radius:99px;transition:width .2s}
+.bar.green>i{background:linear-gradient(90deg,#69f0ae,#00c853)}
+.bar.storm>i{background:linear-gradient(90deg,#d48cff,#7c3aed)}
+.bar.boss>i{background:linear-gradient(90deg,#ff8a80,#d50000)}
+/* game */
+.gametop{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+.qwrap{text-align:center;padding:6px 0}
+.question{font-family:var(--fh);font-size:72px;letter-spacing:2px;line-height:1.1;text-shadow:0 4px 0 rgba(0,0,0,.4)}
+.answer{font-family:var(--fh);font-size:44px;width:220px;max-width:70%;text-align:center;margin-top:10px}
+.answer.good{border-color:var(--good)}.answer.bad{border-color:var(--bad)}
+.feedback{min-height:56px;font-weight:700;font-size:19px;margin-top:10px}
+.feedback .good{color:var(--good)}.feedback .bad{color:var(--bad)}
+.hint{background:rgba(255,204,51,.14);border:2px dashed var(--gold);border-radius:14px;padding:10px 14px;margin-top:8px;font-weight:600}
+.stats3{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.stat{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:8px 14px;text-align:center;min-width:92px}
+.stat b{display:block;font-family:var(--fh);font-size:24px}
+.stat span{font-size:13px;color:var(--muted)}
+.arena{display:flex;justify-content:space-between;align-items:flex-end;gap:10px}
+.fighter{width:44%;text-align:center}
+.fighter .rexbox{width:100%;max-width:190px;margin:0 auto}
+.vs{font-family:var(--fh);font-size:30px;color:var(--gold);align-self:center}
+.hearts{font-size:24px;letter-spacing:2px}
+.dmg{position:fixed;font-family:var(--fh);font-size:30px;pointer-events:none;z-index:30;animation:rise 1s ease-out forwards;text-shadow:0 3px 0 #000}
+@keyframes rise{to{transform:translateY(-70px);opacity:0}}
+/* tables picker */
+.tpick{display:grid;grid-template-columns:repeat(auto-fill,minmax(70px,1fr));gap:10px;margin:14px 0}
+.tbtn{font-family:var(--fh);font-size:22px;padding:14px 0;border-radius:14px;border:3px solid var(--line);background:var(--panel2);color:#fff;cursor:pointer;position:relative}
+.tbtn.on{background:var(--green);border-color:#bff5c6}
+.tbtn small{position:absolute;top:2px;right:6px;font-size:12px}
+/* cards */
+.card{background:var(--panel2);border:2px solid var(--line);border-radius:18px;padding:14px;text-align:center;display:flex;flex-direction:column;gap:8px;align-items:center}
+.card.equipped{border-color:var(--gold);box-shadow:0 0 0 2px var(--gold) inset}
+.card.locked{opacity:.75}
+.card .thumb{width:100%;aspect-ratio:4/3;border-radius:12px;overflow:hidden;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.25)}
+.card .thumb svg{width:100%;height:100%}
+.card .thumb .rexsvg{width:80%;height:auto}
+.card .emo{font-size:40px}
+.price{font-weight:800;color:var(--gold)}
+.tabs{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.tabs .btn.active{background:var(--gold);color:#222;text-shadow:none}
+.badge{background:var(--panel2);border:2px solid var(--line);border-radius:16px;padding:12px;text-align:center}
+.badge .ic{font-size:40px}
+.badge.no{opacity:.4;filter:grayscale(1)}
+/* fossil map */
+.fmap{display:grid;grid-template-columns:repeat(12,1fr);gap:3px;max-width:620px;margin:0 auto}
+.fmap div{aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:6px;font-weight:800;font-size:clamp(9px,2.2vw,15px)}
+.fmap .hd{background:transparent;font-family:var(--fh);color:var(--gold)}
+.fmap .hd.rowh{cursor:pointer;text-decoration:underline dotted}
+.lv-new{background:rgba(255,255,255,.08);color:rgba(255,255,255,.35)}
+.lv-bad{background:#d94848}.lv-ok{background:#e0a020;color:#222}.lv-gold{background:#2fbf63}
+.legend{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin:12px 0;font-size:14px}
+.legend i{display:inline-block;width:14px;height:14px;border-radius:4px;vertical-align:-2px;margin-right:4px}
+table.tbl{width:100%;border-collapse:collapse;font-size:15px}
+.tbl th,.tbl td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}
+.tbl th{color:var(--muted);font-weight:700}
+.mrow{display:grid;grid-template-columns:52px 1fr 50px;gap:10px;align-items:center;margin:5px 0}
+/* overlays */
+#fx{position:fixed;inset:0;pointer-events:none;z-index:40;overflow:hidden}
+.particle{position:absolute;font-size:28px;animation:fly 1s ease-out forwards}
+@keyframes fly{to{transform:translate(var(--dx),var(--dy)) rotate(var(--r));opacity:0}}
+.confetti{position:absolute;top:-20px;width:10px;height:16px;animation:fall linear forwards}
+@keyframes fall{to{transform:translate(var(--dx),110vh) rotate(720deg)}}
+#toasts{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:50;display:flex;flex-direction:column;gap:8px;align-items:center;width:min(92vw,460px)}
+.toast{background:#1b1b1b;border:3px solid var(--gold);border-radius:16px;padding:10px 16px;font-weight:700;box-shadow:0 8px 30px rgba(0,0,0,.5);animation:pop .3s ease-out;width:100%}
+@keyframes pop{from{transform:scale(.6);opacity:0}}
+#countdown{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:45;pointer-events:none;font-family:var(--fh);font-size:140px;color:#fff;text-shadow:0 8px 0 rgba(0,0,0,.45)}
+#countdown span{animation:pop .4s ease-out}
+.warn{background:#5a1d1d;border:2px solid var(--bad);border-radius:12px;padding:10px 14px;margin-bottom:12px}
+.joke-q{font-weight:700}
+@media (max-width:600px){
+  h1{font-size:25px}
+  .question{font-size:52px}
+  .answer{font-size:34px}
+  .rexbox{width:110px}
+  .rexbox.sm{width:80px}
+  .bubble{font-size:15px;margin-bottom:24px}
+  .panel{padding:16px}
+  .logo{font-size:16px}
+  .chip{font-size:13px;padding:3px 9px}
+}
+</style>
+</head>
+<body>
+<div id="scene"></div>
+<header id="topbar">
+  <div class="logo" data-act="home">🦖 DINO <span>TIMES</span></div>
+  <div class="chip" id="rankChip"></div>
+  <div class="chip" id="bucksChip"></div>
+  <div class="chip btnish" id="muteChip" data-act="mute" title="Sound on/off"></div>
+</header>
+<main id="app"></main>
+<div id="fx"></div>
+<div id="toasts"></div>
+<div id="countdown"></div>
+<script>
+'use strict';
+/* =========================================================
+   DINO TIMES TABLES — one self-contained file, no internet needed.
+   Progress is saved in this browser (localStorage), with an
+   export/import "save code" as a backup.
+   ========================================================= */
+
+const TABLES=[2,3,4,5,6,7,8,9,10,11,12];
+const SAVE_KEY='dinoTimesTables.v1';
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const rand=n=>Math.floor(Math.random()*n);
+const pick=a=>a[rand(a.length)];
+const todayStr=(d=new Date())=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const dayDiff=(a,b)=>Math.round((Date.parse(b+'T12:00:00')-Date.parse(a+'T12:00:00'))/864e5);
+
+/* ---------------- SAVE DATA ---------------- */
+function freshState(){
+  return {v:1,name:'',bucks:0,earned:0,
+    owned:['skin:classic','bg:jungle','fx:sparkle'],
+    equip:{skin:'classic',bg:'jungle',fx:'sparkle'},
+    facts:{},best:{rush:0,storm:0},bossLevel:0,badges:{},
+    daily:{count:0,best:0,last:''},sessions:[],
+    totals:{correct:0,wrong:0,rounds:0,secs:0,bestStreak:0,practice:0},
+    lastTables:TABLES.slice(),muted:false};
+}
+function mergeState(obj){
+  const f=freshState();
+  const s=Object.assign(f,obj);
+  for(const k of ['equip','best','daily','totals'])s[k]=Object.assign(freshState()[k],obj[k]||{});
+  return s;
+}
+let saveOK=true;
+function load(){try{const raw=localStorage.getItem(SAVE_KEY);if(raw)return mergeState(JSON.parse(raw))}catch(e){saveOK=false}return freshState()}
+function save(){try{localStorage.setItem(SAVE_KEY,JSON.stringify(S));saveOK=true}catch(e){saveOK=false}}
+let S=load();
+
+/* ---------------- FACT TRACKING ----------------
+   Each fact (7×8 and 8×7 count as the same one) has a score 0..5.
+   Quick correct answers raise it, wrong answers knock it down.
+   4+ = mastered (green), 2+ = getting there (amber), else red. */
+const fkey=(a,b)=>a<=b?a+'x'+b:b+'x'+a;
+function recordFact(a,b,ok,ms){
+  const k=fkey(a,b);const f=S.facts[k]||(S.facts[k]={s:0,n:0,c:0,ms:0});
+  f.n++;
+  if(ok){f.c++;f.ms+=Math.min(ms,30000);f.s=Math.min(5,f.s+(ms<3000?1:ms<6000?.6:.3))}
+  else f.s=Math.max(0,f.s-1.5);
+  f.s=Math.round(f.s*10)/10;
+}
+function factLevel(a,b){const f=S.facts[fkey(a,b)];if(!f||!f.n)return 'new';return f.s>=4?'gold':f.s>=2?'ok':'bad'}
+const tableMastered=t=>TABLES.every(b=>{const f=S.facts[fkey(t,b)];return f&&f.s>=4});
+const tablePct=t=>Math.round(TABLES.reduce((s,b)=>{const f=S.facts[fkey(t,b)];return s+(f?Math.min(f.s,4)/4:0)},0)/TABLES.length*100);
+const masteredTables=()=>TABLES.filter(tableMastered);
+
+/* Picks the next question, leaning towards facts that are new, wrong or slow. */
+function makePicker(tables){
+  let recent=[],count=0;const queue=[];
+  const orient=(a,b)=>Math.random()<.5?{a,b}:{a:b,b:a};
+  return{
+    next(){
+      count++;
+      const qi=queue.findIndex(q=>q.due<=count);
+      if(qi>=0){const q=queue.splice(qi,1)[0];recent=[...recent,fkey(q.a,q.b)].slice(-3);return orient(q.a,q.b)}
+      const pool=[];
+      for(const a of tables)for(const b of TABLES){
+        const k=fkey(a,b);if(recent.includes(k))continue;
+        const f=S.facts[k];pool.push([a,b,f&&f.n?1+(5-f.s)*1.6:4]);
+      }
+      let r=Math.random()*pool.reduce((s,p)=>s+p[2],0),ch=pool[0];
+      for(const p of pool){r-=p[2];if(r<=0){ch=p;break}}
+      recent=[...recent,fkey(ch[0],ch[1])].slice(-3);
+      return orient(ch[0],ch[1]);
+    },
+    retry(a,b){if(!queue.some(q=>fkey(q.a,q.b)===fkey(a,b)))queue.push({a,b,due:count+3})}
+  };
+}
+
+function hintFor(a,b){
+  const p=a*b,x=Math.min(a,b),y=Math.max(a,b),other=n=>x===n?y:x;
+  if(x===7&&y===8)return 'Remember <b>5, 6, 7, 8</b> → <b>56 = 7 × 8</b>. The numbers go in order!';
+  if(x===6&&y===8)return '6 × 8: double 6 × 4 (24) → <b>48</b>. "Six times eight, forty-eight, Rex is late!"';
+  if(x===10||y===10)return `×10? Just stick a 0 on the end: ${other(10)} → <b>${p}</b>.`;
+  if(x===2)return `×2 is just doubling: ${y} + ${y} = <b>${p}</b>.`;
+  if(x===5||y===5){const o=other(5);return `×5 is half of ×10: ${o} × 10 = ${o*10}, half of that is <b>${p}</b>.`}
+  if(x===11||y===11){const o=other(11);return o<=9?`×11 trick for small numbers: write ${o} twice → <b>${p}</b>.`:`11 × ${o} = 10 × ${o} + ${o} = ${o*10} + ${o} = <b>${p}</b>.`}
+  if(x===9||y===9){const o=other(9);return `×9 trick: ${o} × 10 = ${o*10}, then take away ${o} → <b>${p}</b>.`}
+  if(x===y)return `${x} × ${x} is a square number. Picture a ${x} by ${x} block of Minecraft-style cubes: <b>${p}</b>.`;
+  if(x===4||y===4){const o=other(4);return `×4 is double, then double again: ${o} → ${o*2} → <b>${p}</b>.`}
+  if(x===12||y===12){const o=other(12);return `12 × ${o} = 10 × ${o} + 2 × ${o} = ${o*10} + ${o*2} = <b>${p}</b>.`}
+  if(x===8||y===8){const o=other(8);return `×8 is double, double, double: ${o} → ${o*2} → ${o*4} → <b>${p}</b>.`}
+  return `Use one you know: ${x} × ${y-1} = ${x*(y-1)}, then add one more ${x} → <b>${p}</b>.`;
+}
+
+/* ---------------- JOKES & QUIPS ---------------- */
+const Q_GOOD=[
+  'Nailed it, {name}! I\'d high-five you, but… tiny arms.',
+  'ROAR-some!','Dino-mite!','Tea-Rex-cellent!',
+  'Correct! Your brain is bigger than a Stegosaurus\'s. Low bar, but still.',
+  'That answer was so good I nearly did a victory dance. Then I fell over.',
+  'Big brain energy. Way bigger than my arms.',
+  'Even the raptors are taking notes. Shame they can\'t hold pencils.',
+  'Correct! Somebody\'s been eating their brain-o-saurus flakes.',
+  'Clean hit! That was a headshot on that sum.',
+  'You mined that answer like a diamond. ⛏️💎',
+  'That\'s a W, {name}. A big dino-sized W.',
+  'Correct! I\'d give you a hug but… you know. 🦖',
+  'Smashed it harder than a meteor. Too soon?',
+  'Correct! The other dinosaurs are SO jealous.'
+];
+const Q_BAD=[
+  'Oof! Don\'t worry, I tried counting on my fingers once. Couldn\'t reach them.',
+  'Nope! But I once thought the meteor was a shooting star. Made a wish and everything.',
+  'Not quite! That one\'s a sneaky fossil. We\'ll dig it up again.',
+  'Wrong answer! You got eliminated. Respawn and go again! 🔁',
+  'Uh oh. Rex is confused. Rex is always confused.',
+  'Missed! Shake it off like a dino shaking off a meteor. Actually… don\'t. That went badly.',
+  'Close-ish! Even a Creeper gets it wrong sometimes. Then it explodes. Don\'t explode.',
+  'Wrong! The storm got that one. Rotate and try again!',
+  'Nope! Don\'t worry, I still don\'t know what 1 × 1 is. Is it 11?',
+  'That\'s not it, but everyone takes a few goes. Even dinosaurs. Especially dinosaurs.'
+];
+const Q_STREAK=[
+  '{n} in a row! Somebody call the park rangers, {name} is DANGEROUS!',
+  '{n} streak! Are you a hybrid? Half human, half calculator?',
+  '{n} in a row! I\'m getting my sunglasses out. 😎',
+  '{n} in a row! That\'s a Victory Roar-yale streak!',
+  '{n} in a row! Your brain must be made of netherite.'
+];
+const JOKES=[
+  ['What do you call a dinosaur that\'s sleeping?','A dino-SNORE. 😴'],
+  ['What do you call a dinosaur with a huge vocabulary?','A thesaurus. 📖'],
+  ['What\'s a T-Rex\'s favourite number?','EIGHT. (Ate. Get it?)'],
+  ['Why was 6 scared of 7?','Because 7 ATE 9! (He\'s a T-Rex in disguise.)'],
+  ['How do you ask a T-Rex out to lunch?','"Tea, Rex?" ☕'],
+  ['What do you call a T-Rex that\'s been beaten up?','Tyrannosaurus WRECKED.'],
+  ['What did the dinosaur use to build its house?','A dino-SAW. 🪚'],
+  ['Why did the dinosaur cross the road?','Because chickens hadn\'t evolved yet. 🐔'],
+  ['What do dinosaurs put on their bathroom floors?','Rep-TILES.'],
+  ['What do you call a dinosaur that\'s never late?','A Pronto-saurus. ⏱️'],
+  ['What\'s a T-Rex\'s favourite dance emote?','The Floss. It can\'t reach. It\'s tragic. 😭'],
+  ['Why don\'t Creepers ever get invited to parties?','They have a short fuse. 💥'],
+  ['What do you call a fossil that won\'t do its homework?','Lazy bones. 🦴'],
+  ['Why was the maths book sad?','It had too many problems. 📘'],
+  ['What do you get if a dinosaur scores a goal?','A dino-SCORE! ⚽'],
+  ['Why do skeletons never fight each other?','They don\'t have the guts.'],
+  ['What did the Velociraptor say after the exam?','"I absolutely CLAWED it."'],
+  ['What\'s a dinosaur\'s least favourite reindeer?','Comet. ☄️'],
+  ['Why did Steve get kicked out of the library?','He kept mining for information. ⛏️'],
+  ['What do you call a dinosaur in a battle royale?','The last one standing… until the meteor. 🌩️'],
+  ['Why can\'t you hear a Pterodactyl going to the toilet?','Because the "P" is silent. 🤭']
+];
+const fill=(s,o={})=>s.replace(/\{name\}/g,esc(S.name||'Ranger')).replace(/\{n\}/g,o.n||'');
+
+/* ---------------- REX ARTWORK (drawn in SVG) ---------------- */
+const SKINS=[
+  {id:'classic',name:'Classic Rex',price:0,c:{body:'#5cb85c',dark:'#2f7a34',belly:'#d8f0c0'},acc:['stripes']},
+  {id:'ninja',name:'Ninja Raptor',price:150,c:{body:'#3d7bd9',dark:'#1f4c99',belly:'#cfe0ff'},acc:['mask','headband']},
+  {id:'party',name:'Party Rex',price:250,c:{body:'#ff6fae',dark:'#b33a76',belly:'#ffe0ef'},acc:['partyhat','shades']},
+  {id:'pixel',name:'Pixel Rex',price:300,pixel:true,c:{body:'#4caf50',dark:'#2e7d32',belly:'#a5d6a7'}},
+  {id:'banana',name:'Banana Rex',price:350,c:{body:'#ffe135',dark:'#a68200',belly:'#fff6b0'},acc:['spots']},
+  {id:'robo',name:'Robo-Rex',price:500,c:{body:'#9aa5b1',dark:'#4b5660',belly:'#d5dde5'},acc:['robolines','visor','antenna']},
+  {id:'gold',name:'Gold Rex',price:800,c:{body:'#f5c518',dark:'#a8780a',belly:'#fff1a8'},acc:['shine']},
+  {id:'ice',name:'Ice Age Rex',req:'storm15',c:{body:'#8fd3f4',dark:'#3d84ad',belly:'#eefaff'},acc:['frost','scarf']},
+  {id:'king',name:'King Rex',req:'streak25',c:{body:'#7e57c2',dark:'#45288a',belly:'#e3d7ff'},acc:['crown']},
+  {id:'lava',name:'Lava Spino',req:'master7',c:{body:'#d84315',dark:'#6e1806',belly:'#ffb74d'},acc:['sail']},
+  {id:'zombie',name:'Zombie Rex',req:'boss3',c:{body:'#8aa37b',dark:'#44533b',belly:'#c8d6b9'},acc:['stitches'],eye:'#c62828'},
+  {id:'galaxy',name:'Galaxy Dino',req:'masterAll',galaxy:true,c:{body:'#3a1c71',dark:'#1a0b3a',belly:'#e08aa0'},acc:['stars']}
+];
+let svgUid=0;
+function rexSVG(sk,opt={}){
+  if(sk.pixel)return pixelRex(sk,opt);
+  const id='rg'+(++svgUid),c=sk.c,acc=sk.acc||[],has=a=>acc.includes(a);
+  const body=sk.galaxy?`url(#${id})`:c.body,mood=opt.mood||'happy';
+  let s=`<svg viewBox="0 0 220 200" class="rexsvg" aria-hidden="true"${opt.flip?' style="transform:scaleX(-1)"':''}>`;
+  if(sk.galaxy)s+=`<defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2b1260"/><stop offset=".55" stop-color="#7b2ff7"/><stop offset="1" stop-color="#e07a8a"/></linearGradient></defs>`;
+  if(has('sail'))s+=`<path d="M58 114 Q66 26 104 36 Q140 46 142 104Z" fill="${c.dark}"/><path d="M78 104 L82 50 M98 104 L102 42 M118 104 L122 54" stroke="${c.belly}" stroke-width="4" opacity=".6"/>`;
+  if(has('plates'))s+=`<path d="M46 116 l10-24 l10 20 l8-28 l12 26 l8-30 l12 28 l8-26 l12 24 l8-18 l8 16Z" fill="${c.dark}"/>`;
+  s+=`<path d="M4 152 Q38 106 94 108 L100 152 Q50 164 4 152Z" fill="${body}"/>`;
+  s+=`<path d="M78 146 h22 v38 h10 v9 h-32z" fill="${c.dark}"/>`;
+  s+=`<ellipse cx="108" cy="128" rx="48" ry="37" fill="${body}"/>`;
+  s+=`<path d="M116 110 Q122 64 150 62 L174 92 Q160 124 136 130Z" fill="${body}"/>`;
+  s+=`<ellipse cx="132" cy="134" rx="20" ry="30" transform="rotate(-25 132 134)" fill="${c.belly}"/>`;
+  s+=`<path d="M102 146 h26 v40 h13 v9 h-39z" fill="${body}"/><path d="M130 195 l4-6 l4 6 M137 195 l4-6 l4 6" stroke="#fff" stroke-width="2" fill="none"/>`;
+  if(has('stripes'))s+=`<path d="M70 104 l8 14 M88 96 l6 14 M106 92 l4 14 M36 128 l6 12 M54 118 l6 12" stroke="${c.dark}" stroke-width="5" stroke-linecap="round"/>`;
+  if(has('spots'))s+=`<g fill="${c.dark}" opacity=".7"><circle cx="86" cy="112" r="5"/><circle cx="70" cy="132" r="4"/><circle cx="104" cy="104" r="3.5"/><circle cx="46" cy="134" r="3.5"/><circle cx="150" cy="44" r="3"/></g><path d="M206 48 q6 0 8 -6" stroke="#6b4a00" stroke-width="6" stroke-linecap="round" fill="none"/>`;
+  if(has('robolines'))s+=`<path d="M76 118 h40 M80 134 h34 M124 50 v20" stroke="${c.dark}" stroke-width="3"/><g fill="${c.dark}"><circle cx="84" cy="108" r="3"/><circle cx="104" cy="108" r="3"/><circle cx="134" cy="46" r="3"/></g>`;
+  if(has('stitches'))s+=`<path d="M78 112 l30 10 M84 108 l-3 9 M92 111 l-3 9 M100 114 l-3 9" stroke="#2b2b2b" stroke-width="2.5" fill="none"/>`;
+  if(has('stars'))s+=`<g fill="#fff">${[[60,120,2],[84,104,1.6],[100,140,2.2],[40,138,1.5],[118,118,1.4],[140,52,1.8],[186,62,1.5],[150,96,1.6],[72,150,1.3]].map(([x,y,r])=>`<circle cx="${x}" cy="${y}" r="${r}"/>`).join('')}</g>`;
+  // tiny arm (the main joke)
+  s+=`<path d="M146 124 q14 -5 17 5" stroke="${c.dark}" stroke-width="7" fill="none" stroke-linecap="round"/><path d="M162 129 l4 4 M159 131 l2 5" stroke="#fff" stroke-width="2"/>`;
+  if(has('scarf'))s+=`<path d="M122 90 Q148 104 170 90 L172 104 Q148 118 120 104Z" fill="#e53935"/><path d="M132 102 l-8 28 l11-2 l5-24Z" fill="#e53935"/><path d="M134 97 l4 10 M150 99 l2 10 M162 96 l2 9" stroke="#fff" stroke-width="3"/>`;
+  if(has('horns'))s+=`<path d="M124 64 Q110 18 152 28 L140 70Z" fill="${c.dark}"/>`;
+  // mouth (shows when jaw drops), jaw, head
+  s+=`<path d="M140 74 L206 74 L198 100 L146 98Z" fill="#5a1a1a"/>`;
+  s+=`<g${mood==='roar'?' transform="rotate(16 142 76)"':''}><rect x="136" y="68" width="68" height="22" rx="10" fill="${body}"/><path d="M152 72 l4-6 l4 6 l4-6 l4 6 l4-6 l4 6 l4-6 l4 6 l4-6 l4 6" fill="#fff"/></g>`;
+  s+=`<rect x="124" y="32" width="86" height="46" rx="22" fill="${body}"/>`;
+  s+=`<path d="M150 76 l4 7 l4-7 l4 7 l4-7 l4 7 l4-7 l4 7 l4-7 l4 7 l4-7 l4 7" fill="#fff"/>`;
+  s+=mood==='roar'?'':`<path d="M146 78 L206 77" stroke="${c.dark}" stroke-width="2.5"/><path d="M146 78 q-6 -1 -8 -8" stroke="${c.dark}" stroke-width="2.5" fill="none" stroke-linecap="round"/>`;
+  s+=`<circle cx="198" cy="46" r="2.8" fill="${c.dark}"/>`;
+  if(has('frost'))s+=`<path d="M136 36 q6 -8 12 0 q6 -8 12 0 q6 -8 12 0 q6 -8 12 0" fill="#fff" stroke="#fff" stroke-width="2"/>`;
+  if(has('horns'))s+=`<path d="M176 34 l8 -26 l6 26Z M150 34 l3 -20 l8 20Z" fill="#fff8e1" stroke="#8d6e63" stroke-width="1.5"/><path d="M200 40 l8 -12 l2 12Z" fill="#fff8e1"/>`;
+  if(has('mask'))s+=`<rect x="146" y="40" width="44" height="22" rx="8" fill="#1a1a2e"/>`;
+  // eye
+  const eyeC=sk.eye||'#1b1b1b';
+  const px=mood==='sad'?165:mood==='angry'?168:169, py=mood==='sad'?56:53;
+  s+=`<circle cx="166" cy="51" r="10" fill="#fff"/><circle cx="${px}" cy="${py}" r="5" fill="${eyeC}"/><circle cx="${px+2}" cy="${py-2}" r="1.6" fill="#fff"/>`;
+  const brow=mood==='sad'?'M154 42 Q164 34 178 37':mood==='angry'?'M154 36 L178 45':'M154 38 Q166 32 178 37';
+  s+=`<path d="${brow}" stroke="${c.dark}" stroke-width="4" fill="none" stroke-linecap="round"/>`;
+  if(has('headband'))s+=`<rect x="124" y="34" width="86" height="8" fill="#e53935"/><path d="M128 38 q-18 -6 -28 4 M128 40 q-14 8 -22 18" stroke="#e53935" stroke-width="6" fill="none" stroke-linecap="round"/>`;
+  if(has('shades'))s+=`<rect x="150" y="42" width="34" height="17" rx="6" fill="#111"/><rect x="184" y="46" width="18" height="4" fill="#111"/><path d="M154 46 l9 0" stroke="#fff" stroke-width="2" opacity=".7"/>`;
+  if(has('partyhat'))s+=`<path d="M146 36 L172 34 L156 0Z" fill="#ffeb3b"/><path d="M150 26 L166 25 M153 15 L163 14" stroke="#29b6f6" stroke-width="3"/><circle cx="156" cy="1" r="4.5" fill="#e91e63"/>`;
+  if(has('visor'))s+=`<rect x="148" y="41" width="58" height="18" rx="8" fill="#ff1744" opacity=".92"/><rect x="153" y="45" width="22" height="4" rx="2" fill="#fff" opacity=".7"/>`;
+  if(has('antenna'))s+=`<path d="M140 34 L134 10" stroke="${c.dark}" stroke-width="3"/><circle cx="134" cy="9" r="5" fill="#ff1744"/>`;
+  if(has('crown'))s+=`<path d="M146 34 L146 12 L157 23 L168 6 L179 23 L190 12 L190 34Z" fill="#ffd54f" stroke="#b8860b" stroke-width="2"/><circle cx="168" cy="26" r="3.2" fill="#e53935"/><circle cx="154" cy="28" r="2.2" fill="#29b6f6"/><circle cx="182" cy="28" r="2.2" fill="#29b6f6"/>`;
+  if(has('shine'))s+=`<g fill="#fff"><path d="M78 104 l3-9 l3 9 l9 3 l-9 3 l-3 9 l-3-9 l-9-3z"/><path d="M186 30 l2-6 l2 6 l6 2 l-6 2 l-2 6 l-2-6 l-6-2z"/><path d="M40 136 l2-5 l2 5 l5 2 l-5 2 l-2 5 l-2-5 l-5-2z"/></g>`;
+  if(has('stitches'))s+=`<path d="M136 40 l14 6 M140 36 l-2 8 M146 39 l-2 8" stroke="#2b2b2b" stroke-width="2.2"/>`;
+  return s+'</svg>';
+}
+function pixelRex(sk,opt={}){
+  const M=["........GGGGGGG.","........GGGGGGGG",".......GGWKGGGGG",".......GGGGGGGGG",".......GGGGTTTT.",".......GGGGGGG..","G.....GGGGG.....","G....GGGGGGG....","GG..GGGGBBGGDD..","GGGGGGGGBBGGD...",".GGGGGGGBBBG....","..GGGGGGBBGG....","...GGGGGGGG.....","....GGG..GG.....","....GG....G.....","....GGG...GG...."];
+  if(opt.mood==='sad'){M[2]=".......GGKWGGGGG"}
+  const col={G:sk.c.body,B:sk.c.belly,W:'#fff',K:'#111',T:'#fff',D:sk.c.dark};
+  let s=`<svg viewBox="0 0 160 160" class="rexsvg" shape-rendering="crispEdges" aria-hidden="true"${opt.flip?' style="transform:scaleX(-1)"':''}>`;
+  M.forEach((row,y)=>[...row].forEach((ch,x)=>{if(col[ch])s+=`<rect x="${x*10}" y="${y*10}" width="10.4" height="10.4" fill="${col[ch]}"/>`}));
+  s+=`<g fill="rgba(0,0,0,.18)">${[[9,1],[11,3],[3,9],[6,11],[8,6]].map(([x,y])=>`<rect x="${x*10}" y="${y*10}" width="10" height="10"/>`).join('')}</g>`;
+  return s+'</svg>';
+}
+const skinById=id=>SKINS.find(s=>s.id===id)||SKINS[0];
+
+/* ---------------- BACKGROUNDS ---------------- */
+function mulberry(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function palm(x,y,s,col){return `<g transform="translate(${x} ${y}) scale(${s})" fill="${col}"><path d="M-6 0 Q4 -90 20 -170 L30 -168 Q16 -90 8 0Z"/><path d="M25 -170 q-60 -20 -110 20 q50 -10 110 -12Z"/><path d="M25 -170 q60 -25 115 15 q-55 -12 -115 -8Z"/><path d="M25 -170 q-30 -45 -80 -50 q40 20 78 56Z"/><path d="M25 -170 q35 -50 85 -45 q-45 15 -82 52Z"/><path d="M25 -172 q-10 40 -50 80 q30 -40 48 -78Z"/></g>`}
+function bgSVG(id,u=''){
+  const P=n=>id+'_'+n+u;
+  const wrap=(inner,defs='')=>`<svg viewBox="0 0 1200 800" preserveAspectRatio="xMidYMax slice" aria-hidden="true"><defs>${defs}</defs>${inner}</svg>`;
+  const grad=(n,a,b,v=1)=>`<linearGradient id="${P(n)}" x1="0" y1="0" x2="${v?0:1}" y2="${v?1:0}"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient>`;
+  const r=mulberry(id.length*99+7);
+  let s='';
+  switch(id){
+  case 'canyon':
+    s=`<rect width="1200" height="800" fill="url(#${P('s')})"/><circle cx="900" cy="170" r="80" fill="#fff3c4"/>
+    <path d="M0 420 L120 420 L140 330 L330 330 L350 420 L520 420 L530 500 L0 520Z" fill="#c8693a"/>
+    <path d="M700 460 L760 300 L960 300 L990 380 L1200 380 V560 H700Z" fill="#b5532a"/>
+    <path d="M0 560 Q300 500 600 560 T1200 540 V800 H0Z" fill="#e0a060"/>
+    <path d="M0 660 Q300 610 600 660 T1200 650 V800 H0Z" fill="#cf8a4a"/>
+    <g fill="none" stroke="#fff4e0" stroke-width="10" stroke-linecap="round" opacity=".55"><path d="M260 690 h180"/><path d="M290 690 q-10 -50 10 -70 M330 690 q-10 -60 10 -80 M370 690 q-10 -60 10 -80 M410 690 q-10 -50 10 -70"/><circle cx="470" cy="676" r="22"/></g>
+    <g fill="#5a8f3c"><path d="M980 640 v-90 q0 -16 14 -16 q14 0 14 16 v90Z"/><path d="M980 600 h-24 v-30 q0 -10 10 -10 q10 0 10 10 v14 h4Z"/><path d="M1008 590 h22 v-34 q0 -10 -10 -10 q-10 0 -10 10 v18 h-2Z"/></g>`;
+    return wrap(s,grad('s','#ff9e5e','#ffe2a8'));
+  case 'pixel':{
+    s=`<rect width="1200" height="800" fill="#7ec8ff"/><rect x="900" y="80" width="90" height="90" fill="#fff6a0"/>`;
+    s+=`<g fill="#fff">${[[120,120],[520,80],[760,180]].map(([x,y])=>`<rect x="${x}" y="${y}" width="160" height="40"/><rect x="${x+40}" y="${y-30}" width="80" height="30"/>`).join('')}</g>`;
+    const hs=[9,9,8,8,7,7,7,8,9,9,8,7,6,6,7,8,8,9,9,10,10,9,8,8];
+    hs.forEach((h,i)=>{const x=i*50,top=h*50;s+=`<rect x="${x}" y="${top}" width="50" height="${800-top}" fill="#8b5a2b"/><rect x="${x}" y="${top}" width="50" height="16" fill="#5dbb4a"/><rect x="${x}" y="${top+16}" width="50" height="6" fill="#4a9a3a"/>`;
+      for(let k=1;k<4;k++)if(r()<.5)s+=`<rect x="${x+(rand(3))*15+5}" y="${top+30+k*40}" width="12" height="12" fill="#6e451f"/>`;});
+    s+=`<rect x="320" y="200" width="30" height="150" fill="#6b4423"/><rect x="250" y="120" width="170" height="110" fill="#3d9b35"/><rect x="280" y="90" width="110" height="40" fill="#3d9b35"/><rect x="290" y="150" width="20" height="20" fill="#2f7d29"/><rect x="360" y="130" width="20" height="20" fill="#2f7d29"/>`;
+    s+=`<rect x="1000" y="330" width="30" height="120" fill="#6b4423"/><rect x="950" y="260" width="130" height="90" fill="#3d9b35"/>`;
+    return wrap(s);}
+  case 'volcano':
+    s=`<rect width="1200" height="800" fill="url(#${P('s')})"/>`;
+    for(let i=0;i<40;i++)s+=`<circle cx="${r()*1200}" cy="${r()*500}" r="${1+r()*3}" fill="#ffb74d" opacity="${.3+r()*.6}"/>`;
+    s+=`<g fill="#4a3a3a" opacity=".8"><circle cx="600" cy="170" r="60"/><circle cx="660" cy="120" r="70"/><circle cx="560" cy="100" r="50"/><circle cx="640" cy="50" r="60"/></g>
+    <path d="M250 640 L520 250 L680 250 L960 640Z" fill="#2b1a1a"/><path d="M520 250 L680 250 L660 280 L540 280Z" fill="#ff6d00"/>
+    <path d="M560 270 Q540 400 500 460 Q480 520 440 560 L470 560 Q520 480 560 420 Q590 360 590 270Z" fill="#ff8f00"/><path d="M630 270 Q660 380 720 470 L745 470 Q690 380 650 270Z" fill="#ff6d00"/>
+    <path d="M0 620 Q300 580 600 630 T1200 600 V800 H0Z" fill="#1a1010"/>
+    ${palm(120,660,.9,'#0d0808')}${palm(1080,650,1,'#0d0808')}`;
+    return wrap(s,grad('s','#2b0a0a','#c4441a'));
+  case 'lab':
+    s=`<rect width="1200" height="800" fill="url(#${P('s')})"/><rect width="1200" height="800" fill="url(#${P('g')})"/>`;
+    let d1='',d2='';for(let x=0;x<=1200;x+=10){d1+=(x?'L':'M')+x+' '+(200+Math.sin(x/60)*50);d2+=(x?'L':'M')+x+' '+(200-Math.sin(x/60)*50)}
+    s+=`<path d="${d1}" stroke="#4dd0e1" stroke-width="5" fill="none" opacity=".6"/><path d="${d2}" stroke="#ffb74d" stroke-width="5" fill="none" opacity=".6"/>`;
+    for(let x=0;x<=1200;x+=60)s+=`<line x1="${x}" x2="${x}" y1="${200+Math.sin(x/60)*50}" y2="${200-Math.sin(x/60)*50}" stroke="#fff" stroke-width="3" opacity=".25"/>`;
+    s+=`<rect x="0" y="600" width="1200" height="200" fill="#0b1c22"/>`;
+    [200,500,800,1050].forEach((x,i)=>{s+=`<rect x="${x-70}" y="560" width="140" height="40" rx="8" fill="#37474f"/><path d="M${x-60} 560 a60 70 0 0 1 120 0Z" fill="#80deea" opacity=".35"/><ellipse cx="${x}" cy="530" rx="26" ry="34" fill="${['#fff3e0','#c5e1a5','#ffe082','#b39ddb'][i]}"/><circle cx="${x}" cy="580" r="5" fill="#76ff03"/>`});
+    return wrap(s,grad('s','#06262e','#0f4250')+`<pattern id="${P('g')}" width="60" height="60" patternUnits="userSpaceOnUse"><path d="M60 0 H0 V60" fill="none" stroke="#4dd0e1" stroke-width="1" opacity=".18"/></pattern>`);
+  case 'ice':
+    s=`<rect width="1200" height="800" fill="url(#${P('s')})"/>
+    <path d="M0 520 L180 260 L300 420 L460 200 L640 470 L800 280 L980 460 L1100 330 L1200 420 V800 H0Z" fill="#a7c7e7"/>
+    <path d="M180 260 L230 330 L200 320 L170 350 L140 318Z M460 200 L520 290 L480 280 L450 310 L420 262Z M800 280 L850 350 L815 340 L790 365 L765 330Z" fill="#fff"/>
+    <path d="M0 620 Q300 570 600 620 T1200 600 V800 H0Z" fill="#e8f6ff"/>
+    <g fill="#bfe6ff" stroke="#fff" stroke-width="3"><path d="M150 640 l60 -60 l70 20 l10 60Z"/><path d="M900 650 l40 -80 l80 30 l-10 70Z"/></g>`;
+    for(let i=0;i<70;i++)s+=`<circle cx="${r()*1200}" cy="${r()*800}" r="${1.5+r()*3}" fill="#fff" opacity=".85"/>`;
+    return wrap(s,grad('s','#9fd3ff','#f2fbff'));
+  case 'storm':
+    s=`<rect width="1200" height="800" fill="url(#${P('s')})"/>`;
+    for(let i=0;i<60;i++){const x=r()*1200,y=r()*800;s+=`<line x1="${x}" y1="${y}" x2="${x-12}" y2="${y+30}" stroke="#d1b3ff" stroke-width="2" opacity=".4"/>`}
+    s+=`<circle cx="600" cy="560" r="520" fill="none" stroke="#b388ff" stroke-width="30" opacity=".45"/><circle cx="600" cy="560" r="520" fill="none" stroke="#e1bee7" stroke-width="6" opacity=".7" stroke-dasharray="20 14"/>
+    <path d="M0 640 Q300 600 600 640 T1200 620 V800 H0Z" fill="#2d1b4e"/><path d="M380 640 Q600 520 820 640Z" fill="#4caf50"/>
+    ${palm(560,610,.6,'#1b5e20')}
+    <path d="M900 60 l-40 120 h40 l-60 140 l110 -170 h-45 l40 -90Z" fill="#fff59d"/><path d="M220 100 l-25 80 h25 l-40 90 l75 -110 h-30 l25 -60Z" fill="#fff59d" opacity=".8"/>`;
+    return wrap(s,grad('s','#1a0633','#6a3fb0'));
+  case 'space':
+    s=`<rect width="1200" height="800" fill="#050b1f"/>`;
+    for(let i=0;i<180;i++)s+=`<circle cx="${r()*1200}" cy="${r()*800}" r="${.5+r()*2}" fill="#fff" opacity="${.3+r()*.7}"/>`;
+    s+=`<ellipse cx="300" cy="200" rx="200" ry="90" fill="#7b1fa2" opacity=".18"/><ellipse cx="900" cy="550" rx="260" ry="110" fill="#1976d2" opacity=".15"/>
+    <circle cx="950" cy="200" r="90" fill="#ff8a65"/><ellipse cx="950" cy="200" rx="150" ry="28" fill="none" stroke="#ffe0b2" stroke-width="10" transform="rotate(-18 950 200)"/>
+    <circle cx="200" cy="650" r="140" fill="#1e88e5"/><path d="M110 600 q40 -40 90 -10 q20 40 -20 60 q-50 10 -70 -50Z M230 700 q30 -30 60 0 q-10 40 -60 0Z" fill="#43a047"/>
+    <path d="M700 120 L460 420" stroke="url(#${P('t')})" stroke-width="26" stroke-linecap="round"/><circle cx="460" cy="420" r="22" fill="#8d6e63"/><circle cx="452" cy="414" r="5" fill="#5d4037"/>`;
+    return wrap(s,`<linearGradient id="${P('t')}" x1="1" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffeb3b" stop-opacity="0"/><stop offset="1" stop-color="#ff5722"/></linearGradient>`);
+  default: // jungle
+    s=`<rect width="1200" height="800" fill="url(#${P('s')})"/><circle cx="1000" cy="140" r="70" fill="#fff6a8"/>
+    <path d="M650 520 L760 340 L820 340 L930 520Z" fill="#7d9a6b"/><g fill="#fff" opacity=".7"><circle cx="790" cy="310" r="22"/><circle cx="810" cy="280" r="18"/></g>
+    <path d="M0 560 Q200 450 420 540 T850 520 T1200 500 V800 H0Z" fill="#6cbf5a"/>
+    <path d="M250 545 q8 -34 46 -34 q26 0 36 16 q8 -60 18 -120 q4 -18 18 -14 q9 4 2 14 q-12 60 -10 126 q22 8 30 28 h-18 v-10 h-10 v12 h-20 v-12 h-60 v12 h-20 v-12 h-12Z" fill="#3c8a44" opacity=".75"/>
+    <path d="M0 650 Q250 570 520 650 T1200 630 V800 H0Z" fill="#3f9b45"/>
+    ${palm(90,700,1.1,'#2a6b2f')}${palm(1110,690,1.2,'#2a6b2f')}${palm(980,660,.8,'#2f7a35')}
+    <g fill="#246b2a"><path d="M300 800 q-20 -80 40 -120 q-10 60 0 120Z"/><path d="M360 800 q20 -90 90 -110 q-50 50 -60 110Z"/><path d="M800 800 q-30 -70 30 -110 q0 60 10 110Z"/></g>`;
+    return wrap(s,grad('s','#7fd3ff','#d9f7c5'));
+  }
+}
+const BGS=[
+  {id:'jungle',name:'Jungle Park',price:0},
+  {id:'canyon',name:'Fossil Canyon',price:150},
+  {id:'pixel',name:'Pixel Plains',price:250},
+  {id:'volcano',name:'Volcano Island',price:300},
+  {id:'lab',name:'Dino Lab',price:400},
+  {id:'ice',name:'Ice Age',req:'daily3'},
+  {id:'storm',name:'Storm Island',req:'rush25'},
+  {id:'space',name:'Meteor Space',req:'tamer3'}
+];
+const FXS=[
+  {id:'sparkle',name:'Sparkles',e:['✨','⭐','💫'],price:0},
+  {id:'bones',name:'Bone Zone',e:['🦴','💀','🦴'],price:100},
+  {id:'meteor',name:'Meteor Shower',e:['☄️','🔥','💥'],price:200},
+  {id:'blocks',name:'Block Break',e:['🟩','🟫','🟨','⬜'],price:200},
+  {id:'eggs',name:'Egg Hatch',e:['🥚','🐣','🦕'],price:250},
+  {id:'zap',name:'Storm Zap',e:['⚡','🌩️','💜'],req:'speed'},
+  {id:'crowns',name:'Royal Roar',e:['👑','💎','🏆'],req:'boss5'}
+];
+
+/* ---------------- BADGES, RANKS, BOSSES ---------------- */
+const BADGES=[
+  {id:'first',ic:'🥚',name:'Hatched!',desc:'Finish your first round'},
+  {id:'streak10',ic:'🔥',name:'Combo Chomper',desc:'10 right in a row'},
+  {id:'streak25',ic:'👑',name:'Unstoppable',desc:'25 right in a row'},
+  {id:'streak50',ic:'💪',name:'No-Arms Hero',desc:'50 right in a row'},
+  {id:'rush15',ic:'🦖',name:'Raptor Runner',desc:'Score 15+ in Raptor Rush'},
+  {id:'rush25',ic:'⚡',name:'Raptor Rocket',desc:'Score 25+ in Raptor Rush'},
+  {id:'rush40',ic:'🚀',name:'Ludicrous Speed',desc:'Score 40+ in Raptor Rush'},
+  {id:'speed',ic:'💨',name:'Speed Demon',desc:'Average under 2 seconds in a Raptor Rush (15+ correct)'},
+  {id:'storm15',ic:'🌪️',name:'Storm Chaser',desc:'Score 15+ in Storm Circle'},
+  {id:'storm30',ic:'🌩️',name:'Eye of the Storm',desc:'Score 30+ in Storm Circle'},
+  {id:'boss1',ic:'⚔️',name:'First Fossil',desc:'Beat your first Dino Battle boss'},
+  {id:'boss3',ic:'🧟',name:'Boss Basher',desc:'Beat boss #3 in Dino Battle'},
+  {id:'boss5',ic:'🏆',name:'Apex Predator',desc:'Beat the final boss'},
+  {id:'comeback',ic:'❤️',name:'Comeback Kid',desc:'Beat a boss with only 1 heart left'},
+  {id:'tamer1',ic:'📗',name:'Table Tamer',desc:'Master any times table'},
+  {id:'tamer3',ic:'📚',name:'Triple Tamer',desc:'Master 3 times tables'},
+  {id:'master7',ic:'🌋',name:'Lava Lord',desc:'Master the 7× table'},
+  {id:'masterAll',ic:'🌌',name:'Dino Legend',desc:'Master EVERY table from 2× to 12×'},
+  {id:'daily3',ic:'📅',name:'Three-Day Roar',desc:'Practise 3 days in a row'},
+  {id:'daily7',ic:'🗓️',name:'Week of Roars',desc:'Practise 7 days in a row'},
+  {id:'c100',ic:'💯',name:'Century',desc:'100 correct answers in total'},
+  {id:'c1000',ic:'🦕',name:'Brachio-Brain',desc:'1,000 correct answers in total'},
+  {id:'practice5',ic:'🌿',name:'Paddock Pro',desc:'Finish 5 Practise rounds'},
+  {id:'shopper',ic:'🛒',name:'Big Spender',desc:'Buy something from the shop'}
+];
+const badgeById=id=>BADGES.find(b=>b.id===id);
+const RANKS=[[0,'Hatchling','🥚'],[100,'Nestling','🐣'],[300,'Raptor','🦖'],[700,'Stomper','🦶'],[1500,'Apex Predator','🦷'],[3000,'Dino Legend','🌋'],[6000,'Mythic Mega-Rex','👑']];
+function rankOf(x){let i=0;RANKS.forEach((r,j)=>{if(x>=r[0])i=j});return i}
+const BOSSES=[
+  {name:'Captain Compy',tables:[2,5,10],hp:10,atk:9,c:{body:'#9ccc65',dark:'#4f7d22',belly:'#f1f8e9'},acc:['stripes'],taunt:'I may be small, but my maths is… also small. Wait.'},
+  {name:'Stego-Steve',tables:[3,4,11],hp:12,atk:8,c:{body:'#4db6ac',dark:'#00564d',belly:'#e0f2f1'},acc:['plates'],taunt:'My brain is the size of a walnut. Yours had better be bigger!'},
+  {name:'Tri-Terror',tables:[6,9],hp:14,atk:7.5,c:{body:'#a1887f',dark:'#4e342e',belly:'#efebe9'},acc:['horns'],taunt:'Three horns. Zero chill.'},
+  {name:'Spino Supreme',tables:[7,8,12],hp:16,atk:7,c:{body:'#ef6c00',dark:'#7a3200',belly:'#ffe0b2'},acc:['sail'],taunt:'7 × 8 is my favourite. I bet it\'s NOT yours.'},
+  {name:'The Mega-Hybrid',tables:TABLES,hp:20,atk:6.5,c:{body:'#eceff1',dark:'#546e7a',belly:'#cfd8dc'},acc:['plates','horns','stripes'],eye:'#e53935',taunt:'Spliced from every dinosaur AND a calculator. Good luck.'}
+];
+
+/* Items with a "req" unlock free when the matching badge is earned. */
+function allItems(){return [...SKINS.map(i=>({...i,kind:'skin'})),...BGS.map(i=>({...i,kind:'bg'})),...FXS.map(i=>({...i,kind:'fx'}))]}
+const owns=(kind,id)=>S.owned.includes(kind+':'+id);
+function syncUnlocks(){
+  const fresh=[];
+  for(const it of allItems())if(it.req&&S.badges[it.req]&&!owns(it.kind,it.id)){S.owned.push(it.kind+':'+it.id);fresh.push(it)}
+  return fresh;
+}
+
+/* ---------------- SOUND (generated, no files) ---------------- */
+let AC=null;
+function ac(){if(!AC){try{AC=new(window.AudioContext||window.webkitAudioContext)()}catch(e){return null}}if(AC.state==='suspended')AC.resume();return AC}
+function tone(f,dur,type='sine',vol=.15,when=0,slide){
+  if(S.muted)return;const c=ac();if(!c)return;
+  const t=c.currentTime+when,o=c.createOscillator(),g=c.createGain();
+  o.type=type;o.frequency.setValueAtTime(f,t);if(slide)o.frequency.exponentialRampToValueAtTime(slide,t+dur);
+  g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(.001,t+dur);
+  o.connect(g);g.connect(c.destination);o.start(t);o.stop(t+dur+.05);
+}
+const SFX={
+  good(){tone(660,.12,'triangle');tone(990,.18,'triangle',.15,.08)},
+  bad(){tone(200,.3,'sawtooth',.1,0,90)},
+  coin(){[880,1175,1568].forEach((f,i)=>tone(f,.12,'square',.06,i*.07))},
+  roar(){tone(240,.7,'sawtooth',.16,0,50);tone(170,.7,'square',.07,0,40)},
+  tick(){tone(1300,.04,'square',.035)},
+  hit(){tone(130,.25,'square',.15,0,55)},
+  crit(){tone(500,.1,'square',.1);tone(1000,.2,'square',.08,.08)},
+  win(){[523,659,784,1047].forEach((f,i)=>tone(f,.28,'triangle',.14,i*.12))},
+  lose(){[400,330,260].forEach((f,i)=>tone(f,.3,'triangle',.12,i*.18))}
+};
+
+/* ---------------- VISUAL FX ---------------- */
+function burst(el,emojis){
+  const fx=$('#fx'),r=(el||document.body).getBoundingClientRect();
+  const cx=r.left+r.width/2,cy=r.top+r.height/2;
+  for(let i=0;i<14;i++){
+    const p=document.createElement('span');p.className='particle';p.textContent=pick(emojis);
+    const ang=Math.random()*Math.PI*2,dist=80+Math.random()*140;
+    p.style.left=cx+'px';p.style.top=cy+'px';
+    p.style.setProperty('--dx',Math.cos(ang)*dist+'px');p.style.setProperty('--dy',Math.sin(ang)*dist+'px');p.style.setProperty('--r',(Math.random()*720-360)+'deg');
+    fx.appendChild(p);setTimeout(()=>p.remove(),1100);
+  }
+}
+function confetti(n=90){
+  const fx=$('#fx'),cols=['#ffd54f','#ff5a5f','#3ddc84','#38a7ff','#9b5cff','#ff8a1f'];
+  for(let i=0;i<n;i++){const c=document.createElement('i');c.className='confetti';c.style.left=Math.random()*100+'vw';c.style.background=pick(cols);
+    c.style.setProperty('--dx',(Math.random()*200-100)+'px');c.style.animationDuration=(2+Math.random()*2)+'s';c.style.animationDelay=Math.random()*.6+'s';fx.appendChild(c);setTimeout(()=>c.remove(),5000)}
+}
+function floatText(el,text,color){
+  const r=el.getBoundingClientRect(),d=document.createElement('div');d.className='dmg';d.textContent=text;d.style.color=color||'#fff';
+  d.style.left=(r.left+r.width/2-30)+'px';d.style.top=(r.top+10)+'px';document.body.appendChild(d);setTimeout(()=>d.remove(),1000);
+}
+function toast(html,ms=3800){const t=document.createElement('div');t.className='toast';t.innerHTML=html;$('#toasts').appendChild(t);setTimeout(()=>t.remove(),ms)}
+function anim(el,cls){if(!el)return;el.classList.remove(cls);void el.offsetWidth;el.classList.add(cls)}
+
+/* ---------------- CHROME (top bar, background) ---------------- */
+function applyBg(){$('#scene').innerHTML=bgSVG(S.equip.bg)}
+function refreshTop(){
+  const ri=rankOf(S.earned);
+  $('#rankChip').textContent=RANKS[ri][2]+' '+RANKS[ri][1];
+  $('#bucksChip').textContent='🪙 '+S.bucks+' Dino Bucks';
+  $('#muteChip').textContent=S.muted?'🔇':'🔊';
+}
+const app=$('#app');
+function show(html){stopGame();app.innerHTML=html;refreshTop();window.scrollTo(0,0)}
+const mySkin=()=>skinById(S.equip.skin);
+const rexBox=(mood,cls='',id='')=>`<div class="rexbox ${cls}"${id?` id="${id}"`:''}>${rexSVG(mySkin(),{mood})}</div>`;
+
+/* ---------------- SCREENS ---------------- */
+function screenName(){
+  show(`<div class="panel">
+    <div class="hero">${rexBox('happy','idle')}<div class="bubble">RAWR! I'm <b>Rex</b>, the T-Rex with the tiniest arms in the park. 🦖<br>I'm terrible at maths. Will you help me? First: what's your name?</div></div>
+    <form id="nameForm" class="row" style="justify-content:center;margin-top:8px">
+      <input type="text" id="nameIn" maxlength="16" placeholder="Your name" autocomplete="off" value="${esc(S.name)}" style="font-size:22px;width:260px">
+      <button class="btn green" type="submit">Let's go! 🦖</button>
+    </form></div>`);
+  const inp=$('#nameIn');inp.focus();
+  $('#nameForm').onsubmit=e=>{e.preventDefault();const n=inp.value.trim().slice(0,16);if(!n){anim(inp,'shake');return}
+    const isNew=!S.name;S.name=n;save();SFX.roar();screenHome(isNew?`Nice to meet you, <b>${esc(n)}</b>! I'd shake your hand, but… <i>*looks sadly at tiny arms*</i>`:null)};
+}
+
+function screenHome(msg){
+  if(!S.name)return screenName();
+  const ri=rankOf(S.earned),next=RANKS[ri+1];
+  const pct=next?Math.round((S.earned-RANKS[ri][0])/(next[0]-RANKS[ri][0])*100):100;
+  const j=pick(JOKES);
+  const today=todayStr();const doneToday=S.daily.last===today;
+  const streakAlive=S.daily.last&&dayDiff(S.daily.last,today)<=1;
+  const streakTxt=doneToday?`🔥 ${S.daily.count}-day streak, today's chest collected!`
+    :streakAlive&&S.daily.count?`🔥 ${S.daily.count}-day streak. Finish a round today to keep it and open a 🎁 bonus chest!`
+    :`🎁 Finish a round today to open your daily bonus chest!`;
+  const greet=msg||pick([`Welcome back, <b>{name}</b>!`,`Oh hey <b>{name}</b>! I've been practising… my roar. Not my maths.`,`<b>{name}</b>! The dinosaurs have escaped and only times tables can stop them!`,`Ready to smash some sums, <b>{name}</b>?`]);
+  show(`${saveOK?'':'<div class="warn">⚠️ This browser is blocking saving. Your progress will vanish when you close it! Use <b>Settings → Save code</b> to back up.</div>'}
+  <div class="panel">
+    <div class="hero">${rexBox('happy','idle','homeRex')}<div class="bubble">${fill(greet)}<br><br><span class="joke-q">${esc(j[0])}</span> <span class="ans" data-act="reveal" data-arg="${esc(j[1])}">(tap for answer)</span></div></div>
+    <div class="row" style="justify-content:space-between"><b>${RANKS[ri][2]} ${RANKS[ri][1]}</b><span class="muted">${next?`${next[0]-S.earned} more Dino Bucks earned until ${next[2]} ${next[1]}`:'MAX RANK! You are a legend.'}</span></div>
+    <div class="bar" style="margin:6px 0 12px"><i style="width:${pct}%"></i></div>
+    <div class="muted" style="margin-bottom:14px">${streakTxt}</div>
+    <div class="grid2">
+      <button class="btn green huge" data-act="practiseSetup">🌿 Practise<span class="sub">No timer. Hints when you're stuck. Learn them properly!</span></button>
+      <button class="btn orange huge" data-act="challenge">⚡ Challenge<span class="sub">Beat the clock, survive the storm, battle bosses!</span></button>
+    </div>
+    <div class="menu">
+      <button class="btn purple small" data-act="shop">🛒 Shop</button>
+      <button class="btn small" data-act="fmap">🗺️ Fossil Map</button>
+      <button class="btn gold small" data-act="badges">🏅 Badges (${Object.keys(S.badges).length}/${BADGES.length})</button>
+      <button class="btn grey small" data-act="stats">📊 Stats</button>
+      <button class="btn grey small" data-act="settings">⚙️ Settings</button>
+    </div>
+  </div>`);
+}
+
+function screenChallenge(){
+  show(`<div class="panel"><h1>⚡ Choose your Challenge</h1>
+  <div class="hero" style="margin-bottom:10px">${rexBox('roar','sm')}<div class="bubble">Challenges earn <b>double Dino Bucks</b>. No pressure. (Lots of pressure.)</div></div>
+  <div class="grid2">
+    <button class="btn orange huge" data-act="tableSetup" data-arg="rush">🦖 Raptor Rush<span class="sub">60 seconds. Answer as many as you can. Streaks multiply your Bucks!<br>Best: ${S.best.rush}</span></button>
+    <button class="btn purple huge" data-act="tableSetup" data-arg="storm">🌪️ Storm Circle<span class="sub">The storm closes in. Each question gets less time. 3 shields.<br>Best: ${S.best.storm}</span></button>
+    <button class="btn red huge" data-act="bosses">⚔️ Dino Battle<span class="sub">Chomp 5 bosses with correct answers before they get you!<br>Bosses beaten: ${S.bossLevel}/5</span></button>
+  </div>
+  <div style="margin-top:14px"><button class="btn grey small" data-act="home">⬅ Back</button></div></div>`);
+}
+
+let pickTables=null,pickMode='practice';
+function screenTables(mode){
+  pickMode=mode;pickTables=new Set(S.lastTables&&S.lastTables.length?S.lastTables:TABLES);
+  const title={practice:'🌿 Practise',rush:'🦖 Raptor Rush',storm:'🌪️ Storm Circle'}[mode];
+  show(`<div class="panel"><h1>${title}</h1><p>Which times tables? Pick as many as you like.</p>
+    <div class="tpick" id="tpick"></div>
+    <div class="row">
+      <button class="btn small grey" data-act="tAll">All</button>
+      <button class="btn small grey" data-act="tNone">None</button>
+      <button class="btn small gold" data-act="tWeak">🎯 Rex's pick: my weakest 3</button>
+    </div>
+    <div class="row" style="margin-top:18px;justify-content:space-between">
+      <button class="btn grey" data-act="${mode==='practice'?'home':'challenge'}">⬅ Back</button>
+      <button class="btn green" id="goBtn" data-act="go">GO! ▶</button>
+    </div></div>`);
+  drawTables();
+}
+function drawTables(){
+  $('#tpick').innerHTML=TABLES.map(t=>`<button class="tbtn ${pickTables.has(t)?'on':''}" data-act="tToggle" data-arg="${t}">${t}×${tableMastered(t)?'<small>✅</small>':''}</button>`).join('');
+  $('#goBtn').disabled=!pickTables.size;
+}
+
+function screenBosses(){
+  show(`<div class="panel"><h1>⚔️ Dino Battle</h1><p>Each correct answer chomps the boss. Answer <b>super fast</b> for a double-damage <b>CRITICAL CHOMP</b>. Take too long, or get one wrong, and the boss attacks!</p>
+  <div class="grid3">${BOSSES.map((b,i)=>{const locked=i>S.bossLevel,beat=i<S.bossLevel;
+    return `<div class="card ${locked?'locked':''}"><div class="thumb">${locked?'<div class="emo">🔒</div>':rexSVG(b,{mood:'angry',flip:true})}</div>
+    <b>${i+1}. ${locked?'???':b.name}</b><span class="muted" style="font-size:14px">${b.tables.length>5?'ALL tables':b.tables.map(t=>t+'×').join(' ')} · ${b.hp} HP</span>
+    ${locked?'<span class="muted">Beat the last boss first</span>':`<button class="btn small ${beat?'grey':'red'}" data-act="fight" data-arg="${i}">${beat?'Rematch ✓':'FIGHT!'}</button>`}</div>`}).join('')}</div>
+  <div style="margin-top:14px"><button class="btn grey small" data-act="challenge">⬅ Back</button></div></div>`);
+}
+
+/* ---------------- GAME ENGINE ---------------- */
+let G=null,loopId=null;
+function stopGame(){if(loopId){clearInterval(loopId);loopId=null}if(G){G.over=true;(G.timeouts||[]).forEach(clearTimeout)}G=null;$('#countdown').innerHTML=''}
+function later(fn,ms){const g=G;const id=setTimeout(()=>{if(G===g&&!g.over)fn()},ms);g.timeouts.push(id)}
+
+function startGame(mode,opt={}){
+  let tables=opt.tables;
+  if(mode==='battle')tables=BOSSES[opt.boss].tables;
+  else S.lastTables=tables.slice();
+  save();
+  show('');
+  G={mode,tables,boss:opt.boss,picker:makePicker(tables),correct:0,wrong:0,streak:0,bestStreak:0,ms:0,bucks:0,
+     q:null,qStart:0,locked:true,startTime:Date.now(),timeouts:[],paused:true,last:performance.now()};
+  if(mode==='rush')G.timeLeft=60;
+  if(mode==='storm'){G.lives=3;G.limit=10}
+  if(mode==='battle'){G.bossHp=BOSSES[opt.boss].hp;G.hearts=5}
+  if(mode==='practice'){G.total=20;G.done=0;G.retype=false}
+  renderGame();
+  loopId=setInterval(tick,100);
+  if(mode==='practice'){G.paused=false;nextQ()}
+  else countdown(()=>{G.paused=false;G.last=performance.now();nextQ()});
+}
+function countdown(done){
+  const cd=$('#countdown'),steps=['3','2','1','ROAR!'];let i=0;
+  const step=()=>{if(!G)return;if(i>=steps.length){cd.innerHTML='';return done()}
+    cd.innerHTML=`<span>${steps[i]}</span>`;i===3?SFX.roar():SFX.tick();i++;later(step,i===4?600:700)};
+  step();
+}
+
+function renderGame(){
+  const m=G.mode;let top='',arena='';
+  const quit=`<button class="btn grey small" data-act="quit">✖ Quit</button>`;
+  if(m==='rush')top=`<div class="fh">🦖 Raptor Rush</div><div class="stats3"><div class="stat"><b id="sScore">0</b><span>score</span></div><div class="stat"><b id="sTime">60</b><span>seconds</span></div><div class="stat"><b id="sMult">x1</b><span>bucks</span></div></div>${quit}`;
+  if(m==='storm')top=`<div class="fh">🌪️ Storm Circle</div><div class="stats3"><div class="stat"><b id="sScore">0</b><span>score</span></div><div class="stat"><b id="sLives">🛡️🛡️🛡️</b><span>shields</span></div></div>${quit}`;
+  if(m==='practice')top=`<div class="fh">🌿 Practise</div><div class="stats3"><div class="stat"><b id="sDone">0/20</b><span>done</span></div><div class="stat"><b id="sStreak">0</b><span>streak</span></div></div>${quit}`;
+  if(m==='battle'){const B=BOSSES[G.boss];
+    top=`<div class="fh">⚔️ vs ${B.name}</div>${quit}`;
+    arena=`<div class="arena"><div class="fighter"><div class="rexbox" id="meRex">${rexSVG(mySkin())}</div><div class="hearts" id="sHearts"></div><b>${esc(S.name)}</b></div>
+      <div class="vs">VS</div>
+      <div class="fighter"><div class="rexbox" id="bossRex">${rexSVG(B,{mood:'angry',flip:true})}</div><div class="bar boss"><i id="bossBar" style="width:100%"></i></div><b>${B.name}</b> <span class="muted" id="bossHpTxt"></span></div></div>
+      <div class="muted center" style="margin-top:6px">Boss attacks in: </div><div class="bar storm"><i id="atkBar" style="width:100%"></i></div>`;
+  }
+  const timeBar=m==='rush'?`<div class="bar"><i id="tBar" style="width:100%"></i></div>`:m==='storm'?`<div class="bar storm"><i id="tBar" style="width:100%"></i></div><div class="muted center" style="font-size:13px">⛈️ the storm is closing in…</div>`:'';
+  const rexRow=m==='battle'?'':`<div class="hero" style="margin-top:10px">${rexBox('happy','sm','gRex')}<div class="bubble" id="gBubble">${m==='practice'?fill('Take your time, {name}. No clock here. Just you, me and some numbers. 🦖'):fill(pick(['Go go go, {name}!','Fingers on the keyboard. (Lucky you, having long arms.)','Let\'s gooo!']))}</div></div>`;
+  app.innerHTML=`<div class="panel">
+    <div class="gametop">${top}</div>${timeBar}${arena}
+    <div class="qwrap"><div class="question" id="qText">?</div>
+      <form id="ansForm" autocomplete="off"><input type="text" inputmode="numeric" pattern="[0-9]*" class="answer" id="ansIn" aria-label="Your answer" autocomplete="off"></form>
+      <div class="feedback" id="fb"><span class="muted">Type your answer and press <b>Enter</b></span></div></div>
+    ${rexRow}</div>`;
+  $('#ansForm').onsubmit=e=>{e.preventDefault();submit()};
+  updateHud();
+}
+function updateHud(){
+  if(!G)return;const m=G.mode,set=(id,v)=>{const e=$(id);if(e)e.innerHTML=v};
+  set('#sScore',G.correct);
+  if(m==='rush'){set('#sTime',Math.max(0,Math.ceil(G.timeLeft)));set('#sMult','x'+mult());const b=$('#tBar');if(b)b.style.width=Math.max(0,G.timeLeft/60*100)+'%'}
+  if(m==='storm')set('#sLives','🛡️'.repeat(G.lives)+'<span style="opacity:.25">'+'🛡️'.repeat(3-G.lives)+'</span>');
+  if(m==='practice'){set('#sDone',G.done+'/'+G.total);set('#sStreak',G.streak)}
+  if(m==='battle'){const B=BOSSES[G.boss];set('#sHearts','❤️'.repeat(G.hearts)+'<span style="opacity:.25">'+'🖤'.repeat(5-G.hearts)+'</span>');
+    const bb=$('#bossBar');if(bb)bb.style.width=Math.max(0,G.bossHp/B.hp*100)+'%';set('#bossHpTxt',Math.max(0,G.bossHp)+'/'+B.hp)}
+}
+const mult=()=>G.streak>=10?3:G.streak>=5?2:1;
+function say(html,mood){const b=$('#gBubble');if(b)b.innerHTML=html;const r=$('#gRex');if(r&&mood){r.innerHTML=rexSVG(mySkin(),{mood});anim(r,mood==='sad'?'shake':'bounce')}}
+
+function nextQ(){
+  if(!G||G.over)return;
+  G.q=G.picker.next();G.qStart=performance.now();G.locked=false;G.lastTickSec=null;
+  $('#qText').textContent=`${G.q.a} × ${G.q.b}`;
+  const inp=$('#ansIn');inp.value='';inp.className='answer';inp.focus();
+}
+function tick(){
+  if(!G||G.over||G.paused)return;
+  const now=performance.now(),dt=(now-G.last)/1000;G.last=now;
+  if(G.mode==='rush'){G.timeLeft-=dt;if(G.timeLeft<=10&&Math.ceil(G.timeLeft)!==G.lastTickSec){G.lastTickSec=Math.ceil(G.timeLeft);SFX.tick()}updateHud();if(G.timeLeft<=0)return endGame()}
+  if(G.locked)return;
+  if(G.mode==='storm'){const left=G.limit-(now-G.qStart)/1000;const b=$('#tBar');if(b)b.style.width=Math.max(0,left/G.limit*100)+'%';
+    if(left<=3&&Math.ceil(left)!==G.lastTickSec){G.lastTickSec=Math.ceil(left);SFX.tick()}
+    if(left<=0)wrong(null,true)}
+  if(G.mode==='battle'){const B=BOSSES[G.boss],el=(now-G.qStart)/1000;const b=$('#atkBar');if(b)b.style.width=Math.max(0,(1-el/B.atk)*100)+'%';
+    if(el>=B.atk){G.qStart=now;bossAttack('Too slow! ')}}
+}
+function submit(){
+  if(!G||G.over||G.locked)return;
+  const inp=$('#ansIn'),v=inp.value.trim();if(v==='')return;
+  const n=parseInt(v,10);if(isNaN(n)){inp.value='';return}
+  const {a,b}=G.q;
+  if(G.retype){
+    if(n===a*b){G.retype=false;SFX.good();G.done++;updateHud();$('#fb').innerHTML='<span class="good">👍 That\'s the one. Locked in your brain now!</span>';say(fill(pick(['There you go, {name}! That fossil is dug up. 🦴','Now you know it! I\'ll ask again in a bit, just to check.'])),'happy');G.locked=true;later(()=>G.done>=G.total?endGame():nextQ(),700)}
+    else{anim(inp,'shake');inp.value='';SFX.bad()}
+    return;
+  }
+  const ms=performance.now()-G.qStart;
+  n===a*b?right(ms):wrong(n,false);
+}
+function right(ms){
+  const {a,b}=G.q,inp=$('#ansIn');
+  recordFact(a,b,true,ms);G.correct++;G.ms+=ms;G.streak++;G.bestStreak=Math.max(G.bestStreak,G.streak);
+  SFX.good();inp.classList.add('good');burst(inp,(FXS.find(f=>f.id===S.equip.fx)||FXS[0]).e);
+  let fb=`<span class="good">✔ ${a} × ${b} = ${a*b}</span>`;
+  if(G.mode==='rush'){const m=mult();G.bucks+=m;floatText(inp,'+'+m+'🪙','#ffd54f')}
+  if(G.mode==='storm'){G.bucks+=2;G.limit=Math.max(3,G.limit-.3)}
+  if(G.mode==='practice'){G.bucks+=1;G.done++}
+  if(G.mode==='battle'){
+    const crit=ms<2500,dmg=crit?2:1;G.bossHp-=dmg;G.bucks+=2;
+    const br=$('#bossRex');anim(br,'hitflash');floatText(br,crit?'CRITICAL CHOMP! -2':'-1',crit?'#ffd54f':'#fff');crit?SFX.crit():SFX.hit();
+    const me=$('#meRex');me.innerHTML=rexSVG(mySkin(),{mood:'roar'});anim(me,'bounce');
+    if(crit)fb+=' <span class="good">⚡ CRITICAL!</span>';
+  }
+  $('#fb').innerHTML=fb;
+  if(G.streak%5===0)say(fill(pick(Q_STREAK),{n:G.streak}),'roar');
+  else if(Math.random()<.35)say(fill(pick(Q_GOOD)),'happy');
+  else if(G.mode!=='battle')anim($('#gRex'),'bounce');
+  updateHud();
+  if(G.mode==='battle'&&G.bossHp<=0){G.locked=true;G.won=true;SFX.win();return later(endGame,900)}
+  if(G.mode==='practice'&&G.done>=G.total){G.locked=true;return later(endGame,500)}
+  nextQ();
+}
+function wrong(n,timeout){
+  const {a,b}=G.q,inp=$('#ansIn');
+  recordFact(a,b,false,0);G.wrong++;G.streak=0;G.picker.retry(a,b);
+  SFX.bad();inp.classList.add('bad');anim(inp,'shake');
+  const fb=$('#fb');
+  if(G.mode==='practice'){
+    G.retype=true;inp.value='';inp.classList.remove('bad');
+    fb.innerHTML=`<span class="bad">Not quite!</span><div class="hint">💡 ${hintFor(a,b)}<br>Now type <b>${a*b}</b> to carry on.</div>`;
+    say(fill(pick(Q_BAD)),'sad');return;
+  }
+  G.locked=true;
+  fb.innerHTML=`<span class="bad">${timeout?'⏰ Too slow! ':'✘ '}${a} × ${b} = <b>${a*b}</b></span>`;
+  if(G.mode==='rush'){say(fill(pick(Q_BAD)),'sad');updateHud();return later(nextQ,900)}
+  if(G.mode==='storm'){
+    G.lives--;updateHud();say(timeout?fill(pick(['The storm got you! Rotate, {name}, ROTATE!','Too slow! Even I\'m faster than that, and I have tiny legs too. Wait, no, my legs are huge.'])):fill(pick(Q_BAD)),'sad');
+    if(G.lives<=0)return later(endGame,1100);
+    return later(nextQ,1300);
+  }
+  if(G.mode==='battle'){bossAttack('');if(G.hearts>0)later(nextQ,1100)}
+}
+function bossAttack(prefix){
+  const B=BOSSES[G.boss];G.hearts--;G.streak=0;SFX.roar();
+  const me=$('#meRex');anim(me,'hitflash');floatText(me,'-❤️','#ff5a5f');
+  const br=$('#bossRex');br.innerHTML=rexSVG(B,{mood:'roar',flip:true});anim(br,'bounce');
+  later(()=>{const x=$('#bossRex');if(x)x.innerHTML=rexSVG(B,{mood:'angry',flip:true})},700);
+  if(prefix)$('#fb').innerHTML=`<span class="bad">${prefix}${B.name} attacks!</span>`;
+  updateHud();
+  if(G.hearts<=0){G.locked=true;G.won=false;SFX.lose();later(endGame,1000)}
+}
+
+/* ---------------- END OF ROUND: rewards, badges, saving ---------------- */
+function endGame(){
+  if(!G||G.ended)return;
+  const g=G;g.ended=true;g.over=true;clearInterval(loopId);loopId=null;
+  const m=g.mode,secs=Math.round((Date.now()-g.startTime)/1000);
+  const avg=g.correct?g.ms/g.correct/1000:0;
+  const rankBefore=rankOf(S.earned);
+  const lines=[[`Correct answers`,g.bucks]];
+  let pb=false,victory=false,title='Round over!';
+  if(m==='rush'){title='⏰ Time\'s up!';if(g.correct>S.best.rush&&g.correct>0){pb=true;lines.push(['🏆 New personal best!',25]);S.best.rush=g.correct}}
+  if(m==='storm'){title='🌪️ The storm got you!';if(g.correct>S.best.storm&&g.correct>0){pb=true;lines.push(['🏆 New personal best!',25]);S.best.storm=g.correct}}
+  if(m==='practice'){const fin=g.done>=g.total;title=fin?'🌿 Practise complete!':'Practise stopped';if(fin){lines.push(['Finished the round',10]);S.totals.practice++}}
+  if(m==='battle'){
+    if(g.won){victory=true;title='🏆 VICTORY ROAR-YALE!';lines.push([`Defeated ${BOSSES[g.boss].name}`,30+20*g.boss]);if(g.boss===S.bossLevel)S.bossLevel=Math.min(5,S.bossLevel+1)}
+    else title=`💥 ${BOSSES[g.boss].name} wins this time…`;
+  }
+  // daily chest (only for rounds where something was actually answered)
+  const today=todayStr();
+  if(g.correct>0&&S.daily.last!==today){
+    const diff=S.daily.last?dayDiff(S.daily.last,today):99;
+    S.daily.count=diff===1?S.daily.count+1:1;S.daily.last=today;S.daily.best=Math.max(S.daily.best,S.daily.count);
+    lines.push([`🎁 Daily chest (${S.daily.count}-day streak)`,20+5*Math.min(S.daily.count,10)]);
+  }
+  const total=lines.reduce((s,l)=>s+l[1],0);
+  S.bucks+=total;S.earned+=total;
+  const T=S.totals;T.correct+=g.correct;T.wrong+=g.wrong;T.rounds++;T.secs+=secs;T.bestStreak=Math.max(T.bestStreak,g.bestStreak);
+  S.sessions.push({d:Date.now(),m,c:g.correct,w:g.wrong,s:secs,t:m==='battle'?'Boss '+(g.boss+1):g.tables.length===11?'All':g.tables.join(','),won:m==='battle'?!!g.won:undefined});
+  if(S.sessions.length>300)S.sessions=S.sessions.slice(-300);
+
+  // badges
+  const newB=[],award=id=>{if(!S.badges[id]){S.badges[id]=Date.now();newB.push(badgeById(id))}};
+  if(g.correct>0||m==='battle')award('first');
+  if(g.bestStreak>=10)award('streak10');if(g.bestStreak>=25)award('streak25');if(g.bestStreak>=50)award('streak50');
+  if(m==='rush'){if(g.correct>=15)award('rush15');if(g.correct>=25)award('rush25');if(g.correct>=40)award('rush40');if(g.correct>=15&&avg<2)award('speed')}
+  if(m==='storm'){if(g.correct>=15)award('storm15');if(g.correct>=30)award('storm30')}
+  if(m==='battle'&&g.won){award('boss1');if(g.hearts===1)award('comeback')}
+  if(S.bossLevel>=3)award('boss3');if(S.bossLevel>=5)award('boss5');
+  const mt=masteredTables();if(mt.length>=1)award('tamer1');if(mt.length>=3)award('tamer3');if(mt.includes(7))award('master7');if(mt.length===TABLES.length)award('masterAll');
+  if(S.daily.count>=3)award('daily3');if(S.daily.count>=7)award('daily7');
+  if(T.correct>=100)award('c100');if(T.correct>=1000)award('c1000');
+  if(T.practice>=5)award('practice5');
+  const unlocked=syncUnlocks();
+  const rankAfter=rankOf(S.earned);
+  save();
+
+  // results screen
+  const B=m==='battle'?BOSSES[g.boss]:null;
+  const mood=(victory||pb)?'roar':(g.correct>=g.wrong?'happy':'sad');
+  const acc=g.correct+g.wrong?Math.round(g.correct/(g.correct+g.wrong)*100):0;
+  const comment=victory?fill('You did it, {name}! I\'d lift you onto my shoulders but I can\'t reach.')
+    :pb?fill('NEW PERSONAL BEST! {name}, you absolute legend. 🦖👑')
+    :m==='battle'?fill('That boss cheated. Probably. Have another go, {name}! Check the Fossil Map to see which ones tripped you up.')
+    :acc>=90?fill('Brilliant accuracy, {name}! Your brain is basically a supercomputer with legs.')
+    :acc>=70?fill('Solid work! A bit more practice and you\'ll be unstoppable.')
+    :fill('Every expert was once a hatchling. Try Practise mode on the tricky ones. I believe in you, {name}!');
+  show(`<div class="panel center">
+    <h1>${title}</h1>
+    <div class="hero" style="text-align:left">${rexBox(mood,'','resRex')}<div class="bubble">${comment}</div></div>
+    <div class="stats3" style="margin:6px 0 16px">
+      <div class="stat"><b>${g.correct}</b><span>correct</span></div>
+      <div class="stat"><b>${g.wrong}</b><span>wrong</span></div>
+      <div class="stat"><b>${acc}%</b><span>accuracy</span></div>
+      <div class="stat"><b>${avg?avg.toFixed(1)+'s':'–'}</b><span>avg speed</span></div>
+      <div class="stat"><b>${g.bestStreak}</b><span>best streak</span></div>
+    </div>
+    <table class="tbl" style="max-width:420px;margin:0 auto 14px">${lines.map(l=>`<tr><td>${l[0]}</td><td class="price" style="text-align:right">+${l[1]} 🪙</td></tr>`).join('')}
+      <tr><td><b>Total</b></td><td class="price" style="text-align:right"><b>+${total} 🪙</b></td></tr></table>
+    ${rankAfter>rankBefore?`<div class="hint">⬆️ RANK UP! You're now a <b>${RANKS[rankAfter][2]} ${RANKS[rankAfter][1]}</b>!</div>`:''}
+    ${newB.map(b=>`<div class="hint">🏅 New badge: <b>${b.ic} ${b.name}</b>: ${b.desc}</div>`).join('')}
+    ${unlocked.map(it=>`<div class="hint">🎉 UNLOCKED: <b>${it.name}</b>! Go to the Shop to equip it.</div>`).join('')}
+    <div class="row" style="justify-content:center;margin-top:16px">
+      <button class="btn green" data-act="again">🔁 Play again</button>
+      ${m==='battle'&&g.won&&g.boss<4?`<button class="btn red" data-act="fight" data-arg="${g.boss+1}">⚔️ Next boss</button>`:''}
+      <button class="btn purple" data-act="shop">🛒 Shop</button>
+      <button class="btn grey" data-act="home">🏠 Home</button>
+    </div></div>`);
+  lastGame={mode:m,tables:g.tables,boss:g.boss};
+  if(victory||pb||unlocked.length||rankAfter>rankBefore){confetti();SFX.win()}
+  if(newB.length||unlocked.length)SFX.coin();
+}
+let lastGame=null;
+
+/* ---------------- SHOP ---------------- */
+let shopTab='skin';
+function screenShop(){
+  const list=shopTab==='skin'?SKINS:shopTab==='bg'?BGS:FXS;
+  const cards=list.map(it=>{
+    const own=owns(shopTab,it.id),eq=S.equip[shopTab]===it.id;
+    const thumb=shopTab==='skin'?rexSVG(it):shopTab==='bg'?bgSVG(it.id,'_t'):`<div class="emo">${it.e.join('')}</div>`;
+    let action;
+    if(eq)action=`<button class="btn small gold" disabled>✓ Equipped</button>`;
+    else if(own)action=`<button class="btn small green" data-act="equip" data-arg="${it.id}">Equip</button>`;
+    else if(it.req)action=`<span class="muted" style="font-size:14px">🔒 Earn the <b>${badgeById(it.req).ic} ${badgeById(it.req).name}</b> badge: ${badgeById(it.req).desc}</span>`;
+    else action=`<span class="price">🪙 ${it.price}</span><button class="btn small ${S.bucks>=it.price?'purple':'grey'}" data-act="buy" data-arg="${it.id}" ${S.bucks>=it.price?'':'disabled'}>Buy</button>`;
+    return `<div class="card ${eq?'equipped':''} ${!own&&it.req?'locked':''}"><div class="thumb">${thumb}</div><b>${it.name}</b>${action}</div>`;
+  }).join('');
+  show(`<div class="panel"><h1>🛒 Dino Shop</h1>
+    <p>You have <span class="price">🪙 ${S.bucks} Dino Bucks</span>. Some items can't be bought: you have to <b>earn</b> them. 😏</p>
+    <div class="tabs">${[['skin','🦖 Skins'],['bg','🏞️ Backgrounds'],['fx','✨ Effects']].map(([k,l])=>`<button class="btn small ${shopTab===k?'active':'grey'}" data-act="shopTab" data-arg="${k}">${l}</button>`).join('')}</div>
+    <div class="grid3">${cards}</div>
+    <div style="margin-top:14px"><button class="btn grey small" data-act="home">⬅ Back</button></div></div>`);
+}
+function buy(id){
+  const list=shopTab==='skin'?SKINS:shopTab==='bg'?BGS:FXS,it=list.find(x=>x.id===id);
+  if(!it||it.req||owns(shopTab,id)||S.bucks<it.price)return;
+  S.bucks-=it.price;S.owned.push(shopTab+':'+id);S.equip[shopTab]=id;
+  SFX.coin();
+  if(!S.badges.shopper){S.badges.shopper=Date.now();toast('🏅 New badge: <b>🛒 Big Spender</b>')}
+  toast(`🎉 You bought <b>${it.name}</b>! ${pick(['Looking fresh.','Absolute drip. 💧','Rex approves. Rex is jealous.','Stylish AND smart? Unfair.'])}`);
+  save();if(shopTab==='bg')applyBg();screenShop();
+}
+
+/* ---------------- FOSSIL MAP / BADGES / STATS / SETTINGS ---------------- */
+function screenMap(){
+  let cells='<div class="hd">×</div>'+TABLES.map(t=>`<div class="hd">${t}</div>`).join('');
+  for(const a of TABLES){cells+=`<div class="hd rowh" data-act="practiseOne" data-arg="${a}" title="Practise the ${a}× table">${a}</div>`;
+    for(const b of TABLES){const lv=factLevel(a,b);cells+=`<div class="lv-${lv}" title="${a} × ${b}">${lv==='new'?'?':a*b}</div>`}}
+  const keys=[];for(const a of TABLES)for(const b of TABLES)if(a<=b)keys.push(fkey(a,b));
+  const cnt=lv=>keys.filter(k=>{const[a,b]=k.split('x').map(Number);return factLevel(a,b)===lv}).length;
+  show(`<div class="panel"><h1>🗺️ Fossil Map</h1>
+    <p>Every times-table fact is a fossil waiting to be dug up. Turn the whole map <b>green</b> to become a Dino Legend! Tap a row number to practise that table.</p>
+    <div class="legend"><span><i class="lv-gold"></i>Mastered (${cnt('gold')})</span><span><i class="lv-ok"></i>Getting there (${cnt('ok')})</span><span><i class="lv-bad"></i>Needs work (${cnt('bad')})</span><span><i class="lv-new"></i>Not dug up yet (${cnt('new')})</span></div>
+    <div class="fmap">${cells}</div>
+    <p class="muted center" style="font-size:14px;margin-top:10px">7 × 8 and 8 × 7 count as the same fossil. Facts turn green when you get them right <b>quickly</b>, several times.</p>
+    <div style="margin-top:10px"><button class="btn grey small" data-act="home">⬅ Back</button></div></div>`);
+}
+function screenBadges(){
+  show(`<div class="panel"><h1>🏅 Badges</h1><p>${Object.keys(S.badges).length} of ${BADGES.length} collected. Some badges unlock secret skins and backgrounds!</p>
+    <div class="grid3">${BADGES.map(b=>{const got=S.badges[b.id];const reward=allItems().find(i=>i.req===b.id);
+      return `<div class="badge ${got?'':'no'}"><div class="ic">${b.ic}</div><b>${b.name}</b><div class="muted" style="font-size:14px">${b.desc}</div>${reward?`<div style="font-size:13px;margin-top:4px">🎁 Unlocks: ${reward.name}</div>`:''}${got?`<div style="font-size:12px" class="muted">${new Date(got).toLocaleDateString()}</div>`:''}</div>`}).join('')}</div>
+    <div style="margin-top:14px"><button class="btn grey small" data-act="home">⬅ Back</button></div></div>`);
+}
+function screenStats(){
+  const T=S.totals,acc=T.correct+T.wrong?Math.round(T.correct/(T.correct+T.wrong)*100):0;
+  const mins=Math.round(T.secs/60),days=new Set(S.sessions.map(s=>todayStr(new Date(s.d)))).size;
+  const tricky=Object.entries(S.facts).filter(([,f])=>f.n>=2).sort((x,y)=>x[1].s-y[1].s||(y[1].n-y[1].c)-(x[1].n-x[1].c)).slice(0,8);
+  const mName={rush:'Raptor Rush',storm:'Storm Circle',battle:'Dino Battle',practice:'Practise'};
+  show(`<div class="panel"><h1>📊 Stats</h1><p class="muted">For ${esc(S.name)} (and any curious grown-ups).</p>
+    <div class="stats3" style="justify-content:flex-start">
+      <div class="stat"><b>${T.correct}</b><span>correct answers</span></div>
+      <div class="stat"><b>${acc}%</b><span>accuracy</span></div>
+      <div class="stat"><b>${mins}</b><span>minutes played</span></div>
+      <div class="stat"><b>${T.rounds}</b><span>rounds</span></div>
+      <div class="stat"><b>${days}</b><span>days practised</span></div>
+      <div class="stat"><b>${S.daily.count}/${S.daily.best}</b><span>day streak now / best</span></div>
+      <div class="stat"><b>${S.best.rush}</b><span>best Raptor Rush</span></div>
+      <div class="stat"><b>${S.best.storm}</b><span>best Storm Circle</span></div>
+      <div class="stat"><b>${S.bossLevel}/5</b><span>bosses beaten</span></div>
+      <div class="stat"><b>${T.bestStreak}</b><span>best streak</span></div>
+    </div></div>
+  <div class="panel"><h2>Table mastery</h2>
+    ${TABLES.map(t=>{const p=tablePct(t);return `<div class="mrow"><b>${t}×</b><div class="bar ${p>=100?'green':''}"><i style="width:${p}%"></i></div><span>${p}%${p>=100?' ✅':''}</span></div>`}).join('')}</div>
+  <div class="panel"><h2>Trickiest facts</h2>
+    ${tricky.length?`<table class="tbl"><tr><th>Fact</th><th>Right</th><th>Wrong</th><th>Avg time</th></tr>${tricky.map(([k,f])=>{const[a,b]=k.split('x');return `<tr><td><b>${a} × ${b} = ${a*b}</b></td><td>${f.c}</td><td>${f.n-f.c}</td><td>${f.c?(f.ms/f.c/1000).toFixed(1)+'s':'–'}</td></tr>`}).join('')}</table>`:'<p class="muted">Play a few rounds and the tricky ones will show up here.</p>'}</div>
+  <div class="panel"><h2>Recent rounds</h2>
+    ${S.sessions.length?`<table class="tbl"><tr><th>When</th><th>Mode</th><th>Tables</th><th>✔</th><th>✘</th><th>Time</th></tr>${S.sessions.slice(-12).reverse().map(s=>`<tr><td>${new Date(s.d).toLocaleDateString(undefined,{day:'numeric',month:'short'})} ${new Date(s.d).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'})}</td><td>${mName[s.m]}${s.won===true?' 🏆':''}</td><td>${s.t}</td><td>${s.c}</td><td>${s.w}</td><td>${Math.floor(s.s/60)}:${String(s.s%60).padStart(2,'0')}</td></tr>`).join('')}</table>`:'<p class="muted">No rounds yet!</p>'}
+    <p class="muted" style="font-size:14px;margin-top:10px">Progress is stored in this web browser on this computer. Back it up with a save code in ⚙️ Settings.</p>
+    <button class="btn grey small" data-act="home">⬅ Back</button></div>`);
+}
+function encodeSave(){return 'DINO1:'+btoa(unescape(encodeURIComponent(JSON.stringify(S))))}
+function screenSettings(){
+  show(`<div class="panel"><h1>⚙️ Settings</h1>
+    <h3>Your name</h3>
+    <form id="rn" class="row"><input type="text" id="rnIn" maxlength="16" value="${esc(S.name)}"><button class="btn small green" type="submit">Save name</button></form>
+    <h3 style="margin-top:20px">Sound</h3>
+    <button class="btn small ${S.muted?'grey':'green'}" data-act="mute">${S.muted?'🔇 Sound is OFF (tap to turn on)':'🔊 Sound is ON (tap to turn off)'}</button>
+    <h3 style="margin-top:20px">💾 Save code (backup)</h3>
+    <p class="muted">Your progress lives in this browser. Copy this code somewhere safe (or email it to yourself). Paste it below on another computer or browser to carry on where you left off.</p>
+    <textarea id="saveOut" readonly>${encodeSave()}</textarea>
+    <div class="row" style="margin-top:6px"><button class="btn small" data-act="copySave">📋 Copy code</button></div>
+    <h3 style="margin-top:20px">📥 Load a save code</h3>
+    <textarea id="saveIn" placeholder="Paste a DINO1:... code here"></textarea>
+    <div class="row" style="margin-top:6px"><button class="btn small orange" data-act="loadSave">Load save</button></div>
+    <h3 style="margin-top:20px">Danger zone</h3>
+    <button class="btn small red" data-act="reset">🗑️ Reset ALL progress</button>
+    <div style="margin-top:20px"><button class="btn grey small" data-act="home">⬅ Back</button></div></div>`);
+  $('#rn').onsubmit=e=>{e.preventDefault();const n=$('#rnIn').value.trim().slice(0,16);if(n){S.name=n;save();toast('Name saved! Hi, '+esc(n)+' 👋')}};
+}
+
+/* ---------------- BUTTON ROUTING ---------------- */
+const ACT={
+  home:()=>screenHome(),
+  mute:()=>{S.muted=!S.muted;save();refreshTop();if(!S.muted)SFX.good();if($('#saveOut'))screenSettings()},
+  reveal:(el)=>{el.textContent=el.dataset.arg;el.removeAttribute('data-act');SFX.good()},
+  practiseSetup:()=>screenTables('practice'),
+  challenge:()=>screenChallenge(),
+  tableSetup:(el)=>screenTables(el.dataset.arg),
+  bosses:()=>screenBosses(),
+  tToggle:(el)=>{const t=+el.dataset.arg;pickTables.has(t)?pickTables.delete(t):pickTables.add(t);drawTables()},
+  tAll:()=>{pickTables=new Set(TABLES);drawTables()},
+  tNone:()=>{pickTables=new Set();drawTables()},
+  tWeak:()=>{pickTables=new Set([...TABLES].sort((x,y)=>tablePct(x)-tablePct(y)||Math.random()-.5).slice(0,3));drawTables();toast('🎯 Rex picked your 3 trickiest tables. Mwahaha.')},
+  go:()=>{if(pickTables.size)startGame(pickMode,{tables:[...pickTables].sort((a,b)=>a-b)})},
+  practiseOne:(el)=>startGame('practice',{tables:[+el.dataset.arg]}),
+  fight:(el)=>{const i=+el.dataset.arg;if(i>S.bossLevel)return;stopGame();const B=BOSSES[i];
+    show(`<div class="panel center"><h1>⚔️ ${B.name}</h1><div class="rexbox" style="width:220px;margin:0 auto">${rexSVG(B,{mood:'roar',flip:true})}</div>
+      <div class="bubble" style="margin:14px 0">"${B.taunt}"</div><p>Tables: <b>${B.tables.length>5?'ALL of them!':B.tables.map(t=>t+'×').join(', ')}</b> · Boss attacks every <b>${B.atk}s</b> you don't answer.</p>
+      <button class="btn red huge" data-act="fightGo" data-arg="${i}">FIGHT! ⚔️</button><div style="margin-top:10px"><button class="btn grey small" data-act="bosses">⬅ Back</button></div></div>`);SFX.roar()},
+  fightGo:(el)=>startGame('battle',{boss:+el.dataset.arg}),
+  quit:()=>{if(G&&(G.correct||G.wrong)&&!confirm('Quit this round? You\'ll still keep the Dino Bucks you\'ve earned.'))return;if(G&&(G.correct||G.wrong)){G.quit=true;endGame()}else screenHome()},
+  again:()=>{if(!lastGame)return screenHome();lastGame.mode==='battle'?startGame('battle',{boss:lastGame.boss}):startGame(lastGame.mode,{tables:lastGame.tables})},
+  shop:()=>screenShop(),
+  shopTab:(el)=>{shopTab=el.dataset.arg;screenShop()},
+  buy:(el)=>buy(el.dataset.arg),
+  equip:(el)=>{if(!owns(shopTab,el.dataset.arg))return;S.equip[shopTab]=el.dataset.arg;save();if(shopTab==='bg')applyBg();SFX.coin();screenShop()},
+  fmap:()=>screenMap(),
+  badges:()=>screenBadges(),
+  stats:()=>screenStats(),
+  settings:()=>screenSettings(),
+  copySave:()=>{const t=$('#saveOut');t.select();let ok=false;try{ok=document.execCommand('copy')}catch(e){}
+    if(navigator.clipboard)navigator.clipboard.writeText(t.value).then(()=>toast('📋 Copied! Paste it somewhere safe.'),()=>{if(!ok)toast('Select the text and press Ctrl+C to copy.')});else toast(ok?'📋 Copied!':'Select the text and press Ctrl+C to copy.')},
+  loadSave:()=>{const raw=$('#saveIn').value.trim().replace(/^DINO1:/,'');
+    try{const obj=JSON.parse(decodeURIComponent(escape(atob(raw))));if(!obj||typeof obj.facts!=='object')throw 0;
+      if(!confirm('Replace the current progress with this save code?'))return;
+      S=mergeState(obj);save();applyBg();toast('✅ Save loaded! Welcome back, '+esc(S.name)+'!');screenHome()}
+    catch(e){toast('❌ That code doesn\'t look right. Check you copied all of it.')}},
+  reset:()=>{if(confirm('Really delete ALL progress, Dino Bucks, skins and badges?')&&confirm('Are you REALLY sure? This can\'t be undone!')){S=freshState();save();applyBg();screenName()}}
+};
+document.addEventListener('click',e=>{
+  const el=e.target.closest('[data-act]');if(!el)return;
+  ac();const f=ACT[el.dataset.act];if(f){e.preventDefault();f(el)}
+});
+// keep focus in the answer box during a game (clicking elsewhere shouldn't lose typing)
+document.addEventListener('keydown',e=>{if(G&&!G.over&&/^[0-9]$/.test(e.key)){const i=$('#ansIn');if(i&&document.activeElement!==i){i.focus()}}});
+
+applyBg();refreshTop();screenHome();
+</script>
+</body>
+</html>
