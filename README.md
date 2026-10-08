@@ -1,7 +1,5 @@
 # 🦕 Dino Times Tables
 
-Oct 8, 2026 · @Melissa Bayes
-
 ## Overview
 
 Dino Times Tables is a free, browser-based multiplication practice game for primary school children. Players join Rex the T-Rex on a quest to master their times tables through a range of fast-paced game modes, boss battles, and a shop full of dino skins and backgrounds to unlock.
@@ -11,7 +9,7 @@ No installation, no accounts, no ads — just open the HTML file in a browser an
 ## Features
 
 - 4 game modes: Practise, Raptor Rush, Storm Circle, and Dino Battle (boss fights)
-- Choose any combination of times tables from 1× to 12×
+- Choose any combination of times tables from 2× to 12×
 - Dino Bucks currency — earned by playing, spent in the shop
 - Shop with unlockable Rex skins and animated backgrounds
 - Badges and achievements to collect
