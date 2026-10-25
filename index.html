@@ -130,6 +130,28 @@ table.tbl{width:100%;border-collapse:collapse;font-size:15px}
 #countdown span{animation:pop .4s ease-out}
 .warn{background:#5a1d1d;border:2px solid var(--bad);border-radius:12px;padding:10px 14px;margin-bottom:12px}
 .joke-q{font-weight:700}
+/* operation picker */
+.opick{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0 2px}
+.obtn{font-family:var(--fh);font-size:21px;padding:9px 18px;border-radius:14px;border:3px solid var(--line);background:var(--panel2);color:#fff;cursor:pointer;line-height:1.1}
+.obtn.on{background:var(--purple);border-color:#d9bcff}
+.obtn small{display:block;font-family:"Segoe UI",system-ui,sans-serif;font-size:12px;font-weight:600;opacity:.85}
+/* eggs */
+.eggsvg{width:100%;height:auto;display:block;overflow:visible}
+.eggbox{width:150px;flex:0 0 auto}
+.eggbox.big{width:220px;margin:0 auto}
+.wobble{animation:wobble .62s ease-in-out}
+@keyframes wobble{0%,100%{transform:rotate(0)}20%{transform:rotate(-11deg)}45%{transform:rotate(9deg)}70%{transform:rotate(-6deg)}88%{transform:rotate(4deg)}}
+.crack{animation:crack .55s ease-out}
+@keyframes crack{0%{transform:scale(1)}35%{transform:scale(1.16) rotate(-5deg)}65%{transform:scale(.92) rotate(3deg)}100%{transform:scale(1)}}
+.reveal{animation:reveal .75s cubic-bezier(.2,1.5,.4,1)}
+@keyframes reveal{from{transform:scale(.2) rotate(-25deg);opacity:0}}
+.rar{font-family:var(--fh);font-size:13px;border-radius:999px;padding:2px 11px;display:inline-block;color:#12161a}
+.card.rar-common{border-color:#9ccc65}.card.rar-rare{border-color:#42a5f5}
+.card.rar-epic{border-color:#ab47bc}.card.rar-legendary{border-color:#ffca28;box-shadow:0 0 18px rgba(255,202,40,.45)}
+.card.unknown{opacity:.6}
+.card.unknown .thumb .rexsvg{filter:brightness(0) opacity(.4)}
+.emeter{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;margin:6px 0 12px;font-size:14px}
+.bar.egg>i{background:linear-gradient(90deg,#b2ebf2,#26c6da)}
 @media (max-width:600px){
   h1{font-size:25px}
   .question{font-size:52px}
@@ -149,6 +171,7 @@ table.tbl{width:100%;border-collapse:collapse;font-size:15px}
   <div class="logo" data-act="home">🦖 DINO <span>TIMES</span></div>
   <div class="chip" id="rankChip"></div>
   <div class="chip" id="bucksChip"></div>
+  <div class="chip btnish" id="eggChip" data-act="nest" title="Eggs waiting to hatch"></div>
   <div class="chip btnish" id="muteChip" data-act="mute" title="Sound on/off"></div>
 </header>
 <main id="app"></main>
@@ -179,8 +202,11 @@ function freshState(){
     equip:{skin:'classic',bg:'jungle',fx:'sparkle'},
     facts:{},best:{rush:0,storm:0},bossLevel:0,badges:{},
     daily:{count:0,best:0,last:''},sessions:[],
-    totals:{correct:0,wrong:0,rounds:0,secs:0,bestStreak:0,practice:0},
-    lastTables:TABLES.slice(),muted:false};
+    totals:{correct:0,wrong:0,rounds:0,secs:0,bestStreak:0,practice:0,divCorrect:0,divWrong:0},
+    lastTables:TABLES.slice(),muted:false,
+    /* Added after launch. Old saves have none of these keys; mergeState fills them
+       in from here, so existing progress is completely unaffected. */
+    lastOp:'mul',eggs:0,eggProgress:0,eggPity:0,eggsOpened:0,hatched:{}};
 }
 function mergeState(obj){
   const f=freshState();
@@ -198,38 +224,58 @@ let S=load();
    Quick correct answers raise it, wrong answers knock it down.
    4+ = mastered (green), 2+ = getting there (amber), else red. */
 const fkey=(a,b)=>a<=b?a+'x'+b:b+'x'+a;
-function recordFact(a,b,ok,ms){
+/* Division is scored in SEPARATE fields (ds/dn/dc/dms) on the same fact object, so
+   the multiplication map, mastery bars and badges behave exactly as they always did.
+   Facts saved before division existed simply have no d* fields; every read defaults them. */
+function recordFact(a,b,ok,ms,op){
   const k=fkey(a,b);const f=S.facts[k]||(S.facts[k]={s:0,n:0,c:0,ms:0});
+  if(op==='div'){
+    f.dn=(f.dn||0)+1;f.ds=f.ds||0;
+    if(ok){f.dc=(f.dc||0)+1;f.dms=(f.dms||0)+Math.min(ms,30000);f.ds=Math.min(5,f.ds+(ms<3000?1:ms<6000?.6:.3))}
+    else f.ds=Math.max(0,f.ds-1.5);
+    f.ds=Math.round(f.ds*10)/10;return;
+  }
   f.n++;
   if(ok){f.c++;f.ms+=Math.min(ms,30000);f.s=Math.min(5,f.s+(ms<3000?1:ms<6000?.6:.3))}
   else f.s=Math.max(0,f.s-1.5);
   f.s=Math.round(f.s*10)/10;
 }
-function factLevel(a,b){const f=S.facts[fkey(a,b)];if(!f||!f.n)return 'new';return f.s>=4?'gold':f.s>=2?'ok':'bad'}
-const tableMastered=t=>TABLES.every(b=>{const f=S.facts[fkey(t,b)];return f&&f.s>=4});
-const tablePct=t=>Math.round(TABLES.reduce((s,b)=>{const f=S.facts[fkey(t,b)];return s+(f?Math.min(f.s,4)/4:0)},0)/TABLES.length*100);
-const masteredTables=()=>TABLES.filter(tableMastered);
+const factScore=(f,op)=>op==='div'?{s:f.ds||0,n:f.dn||0,c:f.dc||0,ms:f.dms||0}:{s:f.s,n:f.n,c:f.c,ms:f.ms};
+function factLevel(a,b,op){const f=S.facts[fkey(a,b)];if(!f)return 'new';
+  const v=factScore(f,op);if(!v.n)return 'new';return v.s>=4?'gold':v.s>=2?'ok':'bad'}
+const tableMastered=(t,op)=>TABLES.every(b=>{const f=S.facts[fkey(t,b)];return !!f&&factScore(f,op).s>=4});
+const tablePct=(t,op)=>Math.round(TABLES.reduce((s,b)=>{const f=S.facts[fkey(t,b)];return s+(f?Math.min(factScore(f,op).s,4)/4:0)},0)/TABLES.length*100);
+const masteredTables=()=>TABLES.filter(t=>tableMastered(t));
+const anyDivision=()=>Object.keys(S.facts).some(k=>S.facts[k].dn);
+
+/* A question is {a,b,op}. For '×' it can go either way round; for '÷' the table
+   you picked is always the divisor, so choosing the 7s really means practising "÷ 7". */
+const qLabel=q=>q.op==='div'?(q.a*q.b)+' ÷ '+q.a:q.a+' × '+q.b;
+const qAnswer=q=>q.op==='div'?q.b:q.a*q.b;
+const qFull=q=>qLabel(q)+' = '+qAnswer(q);
+const qFullB=q=>qLabel(q)+' = <b>'+qAnswer(q)+'</b>';
 
 /* Picks the next question, leaning towards facts that are new, wrong or slow. */
-function makePicker(tables){
+function makePicker(tables,op){
   let recent=[],count=0;const queue=[];
-  const orient=(a,b)=>Math.random()<.5?{a,b}:{a:b,b:a};
+  const nextOp=()=>op==='mix'?(Math.random()<.5?'div':'mul'):(op||'mul');
+  const make=(a,b,o)=>o==='div'?{a,b,op:'div'}:(Math.random()<.5?{a,b,op:'mul'}:{a:b,b:a,op:'mul'});
   return{
     next(){
       count++;
       const qi=queue.findIndex(q=>q.due<=count);
-      if(qi>=0){const q=queue.splice(qi,1)[0];recent=[...recent,fkey(q.a,q.b)].slice(-3);return orient(q.a,q.b)}
-      const pool=[];
+      if(qi>=0){const q=queue.splice(qi,1)[0];recent=[...recent,fkey(q.a,q.b)].slice(-3);return make(q.a,q.b,q.op)}
+      const o=nextOp(),pool=[];
       for(const a of tables)for(const b of TABLES){
         const k=fkey(a,b);if(recent.includes(k))continue;
-        const f=S.facts[k];pool.push([a,b,f&&f.n?1+(5-f.s)*1.6:4]);
+        const v=factScore(S.facts[k]||{s:0,n:0},o);pool.push([a,b,v.n?1+(5-v.s)*1.6:4]);
       }
       let r=Math.random()*pool.reduce((s,p)=>s+p[2],0),ch=pool[0];
       for(const p of pool){r-=p[2];if(r<=0){ch=p;break}}
       recent=[...recent,fkey(ch[0],ch[1])].slice(-3);
-      return orient(ch[0],ch[1]);
+      return make(ch[0],ch[1],o);
     },
-    retry(a,b){if(!queue.some(q=>fkey(q.a,q.b)===fkey(a,b)))queue.push({a,b,due:count+3})}
+    retry(a,b,o){if(!queue.some(q=>fkey(q.a,q.b)===fkey(a,b)))queue.push({a,b,op:o,due:count+3})}
   };
 }
 
@@ -247,6 +293,15 @@ function hintFor(a,b){
   if(x===12||y===12){const o=other(12);return `12 × ${o} = 10 × ${o} + 2 × ${o} = ${o*10} + ${o*2} = <b>${p}</b>.`}
   if(x===8||y===8){const o=other(8);return `×8 is double, double, double: ${o} → ${o*2} → ${o*4} → <b>${p}</b>.`}
   return `Use one you know: ${x} × ${y-1} = ${x*(y-1)}, then add one more ${x} → <b>${p}</b>.`;
+}
+/* Division hints lean on the matching times-table fact: dividing is multiplying
+   backwards, so show that link first and the × trick underneath. */
+function hintForQ(q){
+  if(q.op!=='div')return hintFor(q.a,q.b);
+  const d=q.a,ans=q.b,p=d*ans;
+  return `<b>÷ is × backwards.</b> Ask yourself: what times ${d} makes ${p}?<br>`
+    +`${d} × ${ans} = ${p}, so ${p} ÷ ${d} = <b>${ans}</b>.<br>`
+    +`<span style="opacity:.8;font-size:15px">${hintFor(d,ans)}</span>`;
 }
 
 /* ---------------- JOKES & QUIPS ---------------- */
@@ -324,13 +379,45 @@ const SKINS=[
   {id:'zombie',name:'Zombie Rex',req:'boss3',c:{body:'#8aa37b',dark:'#44533b',belly:'#c8d6b9'},acc:['stitches'],eye:'#c62828'},
   {id:'galaxy',name:'Galaxy Dino',req:'masterAll',galaxy:true,c:{body:'#3a1c71',dark:'#1a0b3a',belly:'#e08aa0'},acc:['stars']}
 ];
+/* Skins that ONLY come out of eggs. Kept in a separate list so the shop's Skins
+   tab, and everything anyone has already bought or earned, is untouched. */
+const EGG_SKINS=[
+  // common
+  {id:'moss',name:'Mossy Rex',rarity:'common',c:{body:'#7cb342',dark:'#33691e',belly:'#dcedc8'},acc:['dots']},
+  {id:'cocoa',name:'Cocoa Rex',rarity:'common',c:{body:'#8d6e63',dark:'#4e342e',belly:'#efebe9'},acc:['stripes']},
+  {id:'sandy',name:'Sandy Scute',rarity:'common',c:{body:'#e0c068',dark:'#8d6e2a',belly:'#fff8e1'},acc:['plates']},
+  {id:'mint',name:'Minty Raptor',rarity:'common',c:{body:'#4db6ac',dark:'#00695c',belly:'#e0f2f1'},acc:['stripes']},
+  {id:'dusty',name:'Dusty Diplo',rarity:'common',c:{body:'#b0bec5',dark:'#455a64',belly:'#eceff1'},acc:['dots']},
+  {id:'berry',name:'Berry Bronto',rarity:'common',c:{body:'#ba68c8',dark:'#6a1b9a',belly:'#f3e5f5'},acc:['stripes']},
+  // rare
+  {id:'bubblegum',name:'Bubblegum Rex',rarity:'rare',c:{body:'#ff8ac4',dark:'#ad1457',belly:'#ffe3f1'},acc:['bubbles','dots']},
+  {id:'abyss',name:'Deep Sea Dino',rarity:'rare',c:{body:'#1e88e5',dark:'#0d47a1',belly:'#b3e5fc'},acc:['bubbles','stripes']},
+  {id:'sunset',name:'Sunset Spino',rarity:'rare',c:{body:'#ff7043',dark:'#bf360c',belly:'#ffe0b2'},acc:['sail']},
+  {id:'camo',name:'Camo Clawed',rarity:'rare',c:{body:'#689f38',dark:'#33691e',belly:'#dcedc8'},acc:['camo','headband']},
+  {id:'thunder',name:'Thunder Rex',rarity:'rare',c:{body:'#5c6bc0',dark:'#283593',belly:'#e8eaf6'},acc:['bolt','stripes']},
+  // epic
+  {id:'crystal',name:'Crystal Rex',rarity:'epic',c:{body:'#80deea',dark:'#00838f',belly:'#e0f7fa'},acc:['crystal','shine']},
+  {id:'shadow',name:'Shadow Stalker',rarity:'epic',c:{body:'#37474f',dark:'#0d1114',belly:'#546e7a'},acc:['shadowaura','stripes'],eye:'#ff1744'},
+  {id:'neon',name:'Neon Cyber-Rex',rarity:'epic',c:{body:'#262f63',dark:'#0b1026',belly:'#3a4486'},acc:['neon','visor']},
+  {id:'magma',name:'Magma Hatchling',rarity:'epic',c:{body:'#bf360c',dark:'#3e2723',belly:'#ffcc80'},acc:['flames','plates']},
+  // legendary
+  {id:'prism',name:'Rainbow Prismo',rarity:'legendary',grad:['#ff5252','#ffd740','#69f0ae','#40c4ff','#b388ff'],c:{body:'#7e57c2',dark:'#5e35b1',belly:'#ffffff'},acc:['wings','shine']},
+  {id:'spectre',name:'Spectral Rex',rarity:'legendary',ghost:true,c:{body:'#b2ebf2',dark:'#4dd0e1',belly:'#e0f7fa'},acc:['ghost','stars'],eye:'#00bcd4'},
+  {id:'cosmic',name:'Cosmic Hatchling',rarity:'legendary',grad:['#0b1026','#3f51b5','#e91e63'],c:{body:'#1a237e',dark:'#0b1026',belly:'#c5cae9'},acc:['wings','stars','halo']}
+];
 let svgUid=0;
 function rexSVG(sk,opt={}){
   if(sk.pixel)return pixelRex(sk,opt);
   const id='rg'+(++svgUid),c=sk.c,acc=sk.acc||[],has=a=>acc.includes(a);
-  const body=sk.galaxy?`url(#${id})`:c.body,mood=opt.mood||'happy';
-  let s=`<svg viewBox="0 0 220 200" class="rexsvg" aria-hidden="true"${opt.flip?' style="transform:scaleX(-1)"':''}>`;
+  const body=(sk.galaxy||sk.grad)?`url(#${id})`:c.body,mood=opt.mood||'happy';
+  const st=[];if(opt.flip)st.push('transform:scaleX(-1)');if(sk.ghost)st.push('opacity:.78');
+  let s=`<svg viewBox="0 0 220 200" class="rexsvg" aria-hidden="true"${st.length?` style="${st.join(';')}"`:''}>`;
   if(sk.galaxy)s+=`<defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2b1260"/><stop offset=".55" stop-color="#7b2ff7"/><stop offset="1" stop-color="#e07a8a"/></linearGradient></defs>`;
+  else if(sk.grad)s+=`<defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1">${sk.grad.map((col,i)=>`<stop offset="${(i/(sk.grad.length-1)).toFixed(3)}" stop-color="${col}"/>`).join('')}</linearGradient></defs>`;
+  // ---- egg-skin extras that sit BEHIND the dino ----
+  if(has('shadowaura'))s+=`<defs><radialGradient id="${id}s"><stop offset=".35" stop-color="#000" stop-opacity=".5"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient></defs><ellipse cx="106" cy="126" rx="104" ry="78" fill="url(#${id}s)"/>`;
+  if(has('wings'))s+=`<path d="M96 112 C72 58 38 36 8 44 C30 70 26 102 32 132 Q44 118 56 124 Q66 110 78 116 Q88 106 96 112Z" fill="${c.dark}" opacity=".9"/><path d="M102 106 C92 62 106 30 130 16 C124 46 136 68 148 80 Q128 78 116 90 Q108 97 102 106Z" fill="${c.dark}" opacity=".45"/>`;
+  if(has('crystal'))s+=`<path d="M46 116 l10 -32 l11 30 l10 -38 l13 36 l10 -30 l12 32Z" fill="#b3e5fc" opacity=".92" stroke="#4dd0e1" stroke-width="2"/>`;
   if(has('sail'))s+=`<path d="M58 114 Q66 26 104 36 Q140 46 142 104Z" fill="${c.dark}"/><path d="M78 104 L82 50 M98 104 L102 42 M118 104 L122 54" stroke="${c.belly}" stroke-width="4" opacity=".6"/>`;
   if(has('plates'))s+=`<path d="M46 116 l10-24 l10 20 l8-28 l12 26 l8-30 l12 28 l8-26 l12 24 l8-18 l8 16Z" fill="${c.dark}"/>`;
   s+=`<path d="M4 152 Q38 106 94 108 L100 152 Q50 164 4 152Z" fill="${body}"/>`;
@@ -341,6 +428,13 @@ function rexSVG(sk,opt={}){
   s+=`<path d="M102 146 h26 v40 h13 v9 h-39z" fill="${body}"/><path d="M130 195 l4-6 l4 6 M137 195 l4-6 l4 6" stroke="#fff" stroke-width="2" fill="none"/>`;
   if(has('stripes'))s+=`<path d="M70 104 l8 14 M88 96 l6 14 M106 92 l4 14 M36 128 l6 12 M54 118 l6 12" stroke="${c.dark}" stroke-width="5" stroke-linecap="round"/>`;
   if(has('spots'))s+=`<g fill="${c.dark}" opacity=".7"><circle cx="86" cy="112" r="5"/><circle cx="70" cy="132" r="4"/><circle cx="104" cy="104" r="3.5"/><circle cx="46" cy="134" r="3.5"/><circle cx="150" cy="44" r="3"/></g><path d="M206 48 q6 0 8 -6" stroke="#6b4a00" stroke-width="6" stroke-linecap="round" fill="none"/>`;
+  if(has('camo'))s+=`<g fill="${c.dark}" opacity=".6"><ellipse cx="74" cy="120" rx="19" ry="11" transform="rotate(-18 74 120)"/><ellipse cx="112" cy="142" rx="15" ry="9"/><ellipse cx="44" cy="136" rx="12" ry="7"/><ellipse cx="146" cy="54" rx="11" ry="7"/><ellipse cx="96" cy="104" rx="10" ry="6"/></g>`;
+  if(has('bubbles'))s+=`<g fill="none" stroke="#fff" stroke-width="2.5" opacity=".8"><circle cx="56" cy="92" r="9"/><circle cx="38" cy="72" r="5.5"/><circle cx="76" cy="68" r="4"/><circle cx="200" cy="22" r="6.5"/><circle cx="186" cy="8" r="4"/></g><g fill="#fff" opacity=".85"><circle cx="53" cy="89" r="2"/><circle cx="197" cy="19" r="1.6"/></g>`;
+  if(has('neon'))s+=`<g stroke="#00e5ff" stroke-width="3" fill="none" stroke-linecap="round"><path d="M38 132 q34 -26 74 -28"/><path d="M80 150 q26 -12 54 -14"/><path d="M50 120 q18 -12 36 -16"/></g><g fill="#00e5ff"><circle cx="88" cy="112" r="3.2"/><circle cx="112" cy="104" r="3.2"/><circle cx="64" cy="126" r="2.6"/><circle cx="134" cy="128" r="2.6"/></g>`;
+  if(has('bolt'))s+=`<path d="M84 98 l18 -3 l-9 15 l15 -2 l-24 28 l7 -19 l-13 2Z" fill="#ffee58" stroke="#f9a825" stroke-width="1.5"/>`;
+  if(has('flames'))s+=`<g fill="#ff6d00"><path d="M52 118 q3 -26 17 -34 q-3 15 5 21 q7 -9 5 -21 q16 13 11 34Z"/><path d="M86 106 q3 -20 14 -26 q-2 12 5 17 q5 -8 3 -17 q12 11 9 26Z"/></g><g fill="#ffd54f"><path d="M60 116 q3 -14 9 -18 q0 9 4 12 q4 -6 2 -12 q8 8 6 18Z"/><path d="M92 104 q2 -11 7 -14 q0 7 3 9 q3 -4 2 -9 q6 6 5 14Z"/></g>`;
+  if(has('ghost'))s+=`<ellipse cx="100" cy="158" rx="72" ry="20" fill="${c.belly}" opacity=".45"/><g fill="#fff" opacity=".3"><circle cx="34" cy="94" r="8"/><circle cx="18" cy="112" r="5"/><circle cx="46" cy="76" r="4"/></g>`;
+  if(has('dots'))s+=`<g fill="${c.dark}" opacity=".65"><circle cx="86" cy="112" r="5.5"/><circle cx="68" cy="132" r="4.5"/><circle cx="106" cy="102" r="4"/><circle cx="46" cy="134" r="4"/><circle cx="118" cy="124" r="3.5"/><circle cx="150" cy="44" r="3.5"/></g>`;
   if(has('robolines'))s+=`<path d="M76 118 h40 M80 134 h34 M124 50 v20" stroke="${c.dark}" stroke-width="3"/><g fill="${c.dark}"><circle cx="84" cy="108" r="3"/><circle cx="104" cy="108" r="3"/><circle cx="134" cy="46" r="3"/></g>`;
   if(has('stitches'))s+=`<path d="M78 112 l30 10 M84 108 l-3 9 M92 111 l-3 9 M100 114 l-3 9" stroke="#2b2b2b" stroke-width="2.5" fill="none"/>`;
   if(has('stars'))s+=`<g fill="#fff">${[[60,120,2],[84,104,1.6],[100,140,2.2],[40,138,1.5],[118,118,1.4],[140,52,1.8],[186,62,1.5],[150,96,1.6],[72,150,1.3]].map(([x,y,r])=>`<circle cx="${x}" cy="${y}" r="${r}"/>`).join('')}</g>`;
@@ -370,6 +464,7 @@ function rexSVG(sk,opt={}){
   if(has('visor'))s+=`<rect x="148" y="41" width="58" height="18" rx="8" fill="#ff1744" opacity=".92"/><rect x="153" y="45" width="22" height="4" rx="2" fill="#fff" opacity=".7"/>`;
   if(has('antenna'))s+=`<path d="M140 34 L134 10" stroke="${c.dark}" stroke-width="3"/><circle cx="134" cy="9" r="5" fill="#ff1744"/>`;
   if(has('crown'))s+=`<path d="M146 34 L146 12 L157 23 L168 6 L179 23 L190 12 L190 34Z" fill="#ffd54f" stroke="#b8860b" stroke-width="2"/><circle cx="168" cy="26" r="3.2" fill="#e53935"/><circle cx="154" cy="28" r="2.2" fill="#29b6f6"/><circle cx="182" cy="28" r="2.2" fill="#29b6f6"/>`;
+  if(has('halo'))s+=`<ellipse cx="168" cy="12" rx="29" ry="8" fill="none" stroke="#ffe082" stroke-width="5"/>`;
   if(has('shine'))s+=`<g fill="#fff"><path d="M78 104 l3-9 l3 9 l9 3 l-9 3 l-3 9 l-3-9 l-9-3z"/><path d="M186 30 l2-6 l2 6 l6 2 l-6 2 l-2 6 l-2-6 l-6-2z"/><path d="M40 136 l2-5 l2 5 l5 2 l-5 2 l-2 5 l-2-5 l-5-2z"/></g>`;
   if(has('stitches'))s+=`<path d="M136 40 l14 6 M140 36 l-2 8 M146 39 l-2 8" stroke="#2b2b2b" stroke-width="2.2"/>`;
   return s+'</svg>';
@@ -383,7 +478,7 @@ function pixelRex(sk,opt={}){
   s+=`<g fill="rgba(0,0,0,.18)">${[[9,1],[11,3],[3,9],[6,11],[8,6]].map(([x,y])=>`<rect x="${x*10}" y="${y*10}" width="10" height="10"/>`).join('')}</g>`;
   return s+'</svg>';
 }
-const skinById=id=>SKINS.find(s=>s.id===id)||SKINS[0];
+const skinById=id=>SKINS.find(s=>s.id===id)||EGG_SKINS.find(s=>s.id===id)||SKINS[0];
 
 /* ---------------- BACKGROUNDS ---------------- */
 function mulberry(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
@@ -510,7 +605,14 @@ const BADGES=[
   {id:'c100',ic:'💯',name:'Century',desc:'100 correct answers in total'},
   {id:'c1000',ic:'🦕',name:'Brachio-Brain',desc:'1,000 correct answers in total'},
   {id:'practice5',ic:'🌿',name:'Paddock Pro',desc:'Finish 5 Practise rounds'},
-  {id:'shopper',ic:'🛒',name:'Big Spender',desc:'Buy something from the shop'}
+  {id:'shopper',ic:'🛒',name:'Big Spender',desc:'Buy something from the shop'},
+  {id:'div50',ic:'➗',name:'Divide and Conquer',desc:'50 correct division answers'},
+  {id:'div250',ic:'🧠',name:'Share the Load',desc:'250 correct division answers'},
+  {id:'divTamer',ic:'📘',name:'Division Tamer',desc:'Master the division facts for any table'},
+  {id:'hatch1',ic:'🐣',name:'It Hatched!',desc:'Hatch your very first egg'},
+  {id:'hatch10',ic:'🪹',name:'Nest Builder',desc:'Hatch 10 eggs'},
+  {id:'legend1',ic:'🌈',name:'One in Thirty',desc:'Hatch a Legendary skin'},
+  {id:'eggAll',ic:'🥚',name:'Full Nest',desc:'Collect every single egg skin'}
 ];
 const badgeById=id=>BADGES.find(b=>b.id===id);
 const RANKS=[[0,'Hatchling','🥚'],[100,'Nestling','🐣'],[300,'Raptor','🦖'],[700,'Stomper','🦶'],[1500,'Apex Predator','🦷'],[3000,'Dino Legend','🌋'],[6000,'Mythic Mega-Rex','👑']];
@@ -519,8 +621,8 @@ const BOSSES=[
   {name:'Captain Compy',tables:[2,5,10],hp:10,atk:9,c:{body:'#9ccc65',dark:'#4f7d22',belly:'#f1f8e9'},acc:['stripes'],taunt:'I may be small, but my maths is… also small. Wait.'},
   {name:'Stego-Steve',tables:[3,4,11],hp:12,atk:8,c:{body:'#4db6ac',dark:'#00564d',belly:'#e0f2f1'},acc:['plates'],taunt:'My brain is the size of a walnut. Yours had better be bigger!'},
   {name:'Tri-Terror',tables:[6,9],hp:14,atk:7.5,c:{body:'#a1887f',dark:'#4e342e',belly:'#efebe9'},acc:['horns'],taunt:'Three horns. Zero chill.'},
-  {name:'Spino Supreme',tables:[7,8,12],hp:16,atk:7,c:{body:'#ef6c00',dark:'#7a3200',belly:'#ffe0b2'},acc:['sail'],taunt:'7 × 8 is my favourite. I bet it\'s NOT yours.'},
-  {name:'The Mega-Hybrid',tables:TABLES,hp:20,atk:6.5,c:{body:'#eceff1',dark:'#546e7a',belly:'#cfd8dc'},acc:['plates','horns','stripes'],eye:'#e53935',taunt:'Spliced from every dinosaur AND a calculator. Good luck.'}
+  {name:'Spino Supreme',tables:[7,8,12],op:'mix',hp:16,atk:7,c:{body:'#ef6c00',dark:'#7a3200',belly:'#ffe0b2'},acc:['sail'],taunt:'7 × 8 is my favourite. I bet it\'s NOT yours.'},
+  {name:'The Mega-Hybrid',tables:TABLES,op:'mix',hp:20,atk:6.5,c:{body:'#eceff1',dark:'#546e7a',belly:'#cfd8dc'},acc:['plates','horns','stripes'],eye:'#e53935',taunt:'Spliced from every dinosaur AND a calculator. Good luck.'}
 ];
 
 /* Items with a "req" unlock free when the matching badge is earned. */
@@ -530,6 +632,54 @@ function syncUnlocks(){
   const fresh=[];
   for(const it of allItems())if(it.req&&S.badges[it.req]&&!owns(it.kind,it.id)){S.owned.push(it.kind+':'+it.id);fresh.push(it)}
   return fresh;
+}
+
+/* ---------------- EGGS ----------------
+   One egg per EGG_EVERY correct answers, in any mode. Each egg hatches into a
+   skin from EGG_SKINS only, so nothing in the shop is devalued. Rolls never give
+   a duplicate, and a run of bad luck is capped by the pity counter. */
+const EGG_EVERY=25,EGG_PITY=12;
+const RARITY={
+  common:{name:'Common',col:'#9ccc65',pct:58},
+  rare:{name:'Rare',col:'#42a5f5',pct:28},
+  epic:{name:'Epic',col:'#ab47bc',pct:11},
+  legendary:{name:'Legendary',col:'#ffca28',pct:3}
+};
+const TIERS=['common','rare','epic','legendary'];
+const unhatched=t=>EGG_SKINS.filter(k=>k.rarity===t&&!owns('skin',k.id));
+const eggSkinsOwned=()=>EGG_SKINS.filter(k=>owns('skin',k.id)).length;
+function rollEgg(){
+  S.eggPity=(S.eggPity||0)+1;
+  let tier;
+  const hasE=unhatched('epic').length,hasL=unhatched('legendary').length;
+  if(S.eggPity>=EGG_PITY&&(hasE||hasL))tier=!hasE?'legendary':!hasL?'epic':(Math.random()<.78?'epic':'legendary');
+  else{const r=Math.random()*100;tier=r<58?'common':r<86?'rare':r<97?'epic':'legendary'}
+  if(!unhatched(tier).length){            // tier complete: slide to the nearest one that isn't
+    const i=TIERS.indexOf(tier);
+    tier=[...TIERS.slice(0,i).reverse(),...TIERS.slice(i+1)].find(t=>unhatched(t).length)||null;
+  }
+  if(!tier)return{complete:true,rarity:'legendary',bucks:60};   // whole set collected
+  const sk=pick(unhatched(tier));
+  S.owned.push('skin:'+sk.id);S.hatched[sk.id]=Date.now();
+  if(tier==='epic'||tier==='legendary')S.eggPity=0;
+  return{skin:sk,rarity:tier};
+}
+let eggUid=0;
+function eggSVG(rar,cls=''){
+  const R=RARITY[rar]||RARITY.common,g='eg'+(++eggUid);
+  return `<svg viewBox="0 0 160 200" class="eggsvg ${cls}" aria-hidden="true">
+    <defs><linearGradient id="${g}" x1="0" y1="0" x2=".3" y2="1"><stop offset="0" stop-color="#fffaf0"/><stop offset="1" stop-color="${R.col}"/></linearGradient></defs>
+    <ellipse cx="80" cy="190" rx="46" ry="9" fill="rgba(0,0,0,.32)"/>
+    <path d="M80 12 C122 12 146 76 146 118 C146 158 116 186 80 186 C44 186 14 158 14 118 C14 76 38 12 80 12Z" fill="url(#${g})" stroke="${R.col}" stroke-width="4"/>
+    <g fill="${R.col}" opacity=".7"><ellipse cx="52" cy="98" rx="12" ry="8"/><ellipse cx="100" cy="74" rx="10" ry="7"/><ellipse cx="108" cy="128" rx="13" ry="9"/><ellipse cx="60" cy="150" rx="11" ry="7"/><ellipse cx="82" cy="112" rx="7" ry="5"/></g>
+    <path d="M44 46 q14 -16 36 -14" stroke="#fff" stroke-width="8" fill="none" opacity=".65" stroke-linecap="round"/>
+  </svg>`;
+}
+const rarChip=r=>`<span class="rar" style="background:${RARITY[r].col}">${RARITY[r].name}</span>`;
+function awardNow(id){
+  if(S.badges[id])return false;
+  S.badges[id]=Date.now();const b=badgeById(id);
+  toast(`🏅 New badge: <b>${b.ic} ${b.name}</b>`);SFX.coin();return true;
 }
 
 /* ---------------- SOUND (generated, no files) ---------------- */
@@ -584,6 +734,7 @@ function refreshTop(){
   const ri=rankOf(S.earned);
   $('#rankChip').textContent=RANKS[ri][2]+' '+RANKS[ri][1];
   $('#bucksChip').textContent='🪙 '+S.bucks+' Dino Bucks';
+  const ec=$('#eggChip');ec.style.display=S.eggs?'':'none';ec.textContent='🥚 '+S.eggs;
   $('#muteChip').textContent=S.muted?'🔇':'🔊';
 }
 const app=$('#app');
@@ -620,13 +771,16 @@ function screenHome(msg){
     <div class="hero">${rexBox('happy','idle','homeRex')}<div class="bubble">${fill(greet)}<br><br><span class="joke-q">${esc(j[0])}</span> <span class="ans" data-act="reveal" data-arg="${esc(j[1])}">(tap for answer)</span></div></div>
     <div class="row" style="justify-content:space-between"><b>${RANKS[ri][2]} ${RANKS[ri][1]}</b><span class="muted">${next?`${next[0]-S.earned} more Dino Bucks earned until ${next[2]} ${next[1]}`:'MAX RANK! You are a legend.'}</span></div>
     <div class="bar" style="margin:6px 0 12px"><i style="width:${pct}%"></i></div>
-    <div class="muted" style="margin-bottom:14px">${streakTxt}</div>
+    <div class="muted" style="margin-bottom:10px">${streakTxt}</div>
+    <div class="emeter"><div class="bar egg"><i style="width:${Math.round((S.eggProgress||0)/EGG_EVERY*100)}%"></i></div>
+      <span class="muted">${S.eggs?`🥚 <b>${S.eggs} egg${S.eggs>1?'s':''} ready to hatch!</b>`:`${EGG_EVERY-(S.eggProgress||0)} more correct answers → 🥚`}</span></div>
     <div class="grid2">
       <button class="btn green huge" data-act="practiseSetup">🌿 Practise<span class="sub">No timer. Hints when you're stuck. Learn them properly!</span></button>
       <button class="btn orange huge" data-act="challenge">⚡ Challenge<span class="sub">Beat the clock, survive the storm, battle bosses!</span></button>
     </div>
     <div class="menu">
       <button class="btn purple small" data-act="shop">🛒 Shop</button>
+      <button class="btn small ${S.eggs?'gold':''}" data-act="nest">🥚 Nest${S.eggs?` (${S.eggs})`:''}</button>
       <button class="btn small" data-act="fmap">🗺️ Fossil Map</button>
       <button class="btn gold small" data-act="badges">🏅 Badges (${Object.keys(S.badges).length}/${BADGES.length})</button>
       <button class="btn grey small" data-act="stats">📊 Stats</button>
@@ -646,11 +800,14 @@ function screenChallenge(){
   <div style="margin-top:14px"><button class="btn grey small" data-act="home">⬅ Back</button></div></div>`);
 }
 
-let pickTables=null,pickMode='practice';
+let pickTables=null,pickMode='practice',pickOp='mul';
 function screenTables(mode){
   pickMode=mode;pickTables=new Set(S.lastTables&&S.lastTables.length?S.lastTables:TABLES);
+  pickOp=S.lastOp||'mul';
   const title={practice:'🌿 Practise',rush:'🦖 Raptor Rush',storm:'🌪️ Storm Circle'}[mode];
-  show(`<div class="panel"><h1>${title}</h1><p>Which times tables? Pick as many as you like.</p>
+  show(`<div class="panel"><h1>${title}</h1><p>What would you like to practise?</p>
+    <div class="opick" id="opick"></div>
+    <p class="muted" id="opHint" style="margin-top:10px"></p>
     <div class="tpick" id="tpick"></div>
     <div class="row">
       <button class="btn small grey" data-act="tAll">All</button>
@@ -661,10 +818,18 @@ function screenTables(mode){
       <button class="btn grey" data-act="${mode==='practice'?'home':'challenge'}">⬅ Back</button>
       <button class="btn green" id="goBtn" data-act="go">GO! ▶</button>
     </div></div>`);
-  drawTables();
+  drawOps();drawTables();
+}
+function drawOps(){
+  const ops=[['mul','×','times tables'],['div','÷','division'],['mix','×÷','a bit of both']];
+  $('#opick').innerHTML=ops.map(([k,sym,lab])=>`<button class="obtn ${pickOp===k?'on':''}" data-act="oSet" data-arg="${k}">${sym}<small>${lab}</small></button>`).join('');
+  $('#opHint').innerHTML=pickOp==='mul'?'Which times tables? Pick as many as you like.'
+    :pickOp==='div'?'Pick the tables you want to <b>divide by</b> — choose 7 and you\'ll get questions like <b>56 ÷ 7</b>.'
+    :'Half times tables, half division. Pick the tables you want.';
 }
 function drawTables(){
-  $('#tpick').innerHTML=TABLES.map(t=>`<button class="tbtn ${pickTables.has(t)?'on':''}" data-act="tToggle" data-arg="${t}">${t}×${tableMastered(t)?'<small>✅</small>':''}</button>`).join('');
+  const dv=pickOp==='div',op=dv?'div':'mul';
+  $('#tpick').innerHTML=TABLES.map(t=>`<button class="tbtn ${pickTables.has(t)?'on':''}" data-act="tToggle" data-arg="${t}">${dv?'÷'+t:t+'×'}${tableMastered(t,op)?'<small>✅</small>':''}</button>`).join('');
   $('#goBtn').disabled=!pickTables.size;
 }
 
@@ -672,7 +837,7 @@ function screenBosses(){
   show(`<div class="panel"><h1>⚔️ Dino Battle</h1><p>Each correct answer chomps the boss. Answer <b>super fast</b> for a double-damage <b>CRITICAL CHOMP</b>. Take too long, or get one wrong, and the boss attacks!</p>
   <div class="grid3">${BOSSES.map((b,i)=>{const locked=i>S.bossLevel,beat=i<S.bossLevel;
     return `<div class="card ${locked?'locked':''}"><div class="thumb">${locked?'<div class="emo">🔒</div>':rexSVG(b,{mood:'angry',flip:true})}</div>
-    <b>${i+1}. ${locked?'???':b.name}</b><span class="muted" style="font-size:14px">${b.tables.length>5?'ALL tables':b.tables.map(t=>t+'×').join(' ')} · ${b.hp} HP</span>
+    <b>${i+1}. ${locked?'???':b.name}</b><span class="muted" style="font-size:14px">${b.tables.length>5?'ALL tables':b.tables.map(t=>t+'×').join(' ')} · ${b.hp} HP${b.op==='mix'?' · × and ÷':''}</span>
     ${locked?'<span class="muted">Beat the last boss first</span>':`<button class="btn small ${beat?'grey':'red'}" data-act="fight" data-arg="${i}">${beat?'Rematch ✓':'FIGHT!'}</button>`}</div>`}).join('')}</div>
   <div style="margin-top:14px"><button class="btn grey small" data-act="challenge">⬅ Back</button></div></div>`);
 }
@@ -683,12 +848,12 @@ function stopGame(){if(loopId){clearInterval(loopId);loopId=null}if(G){G.over=tr
 function later(fn,ms){const g=G;const id=setTimeout(()=>{if(G===g&&!g.over)fn()},ms);g.timeouts.push(id)}
 
 function startGame(mode,opt={}){
-  let tables=opt.tables;
-  if(mode==='battle')tables=BOSSES[opt.boss].tables;
-  else S.lastTables=tables.slice();
+  let tables=opt.tables,op=opt.op||'mul';
+  if(mode==='battle'){tables=BOSSES[opt.boss].tables;op=BOSSES[opt.boss].op||'mul'}
+  else{S.lastTables=tables.slice();S.lastOp=op}
   save();
   show('');
-  G={mode,tables,boss:opt.boss,picker:makePicker(tables),correct:0,wrong:0,streak:0,bestStreak:0,ms:0,bucks:0,
+  G={mode,op,tables,boss:opt.boss,picker:makePicker(tables,op),correct:0,wrong:0,divC:0,divW:0,streak:0,bestStreak:0,ms:0,bucks:0,
      q:null,qStart:0,locked:true,startTime:Date.now(),timeouts:[],paused:true,last:performance.now()};
   if(mode==='rush')G.timeLeft=60;
   if(mode==='storm'){G.lives=3;G.limit=10}
@@ -708,10 +873,11 @@ function countdown(done){
 
 function renderGame(){
   const m=G.mode;let top='',arena='';
+  const opTag=G.op==='div'?' ÷':G.op==='mix'?' ×÷':'';
   const quit=`<button class="btn grey small" data-act="quit">✖ Quit</button>`;
-  if(m==='rush')top=`<div class="fh">🦖 Raptor Rush</div><div class="stats3"><div class="stat"><b id="sScore">0</b><span>score</span></div><div class="stat"><b id="sTime">60</b><span>seconds</span></div><div class="stat"><b id="sMult">x1</b><span>bucks</span></div></div>${quit}`;
-  if(m==='storm')top=`<div class="fh">🌪️ Storm Circle</div><div class="stats3"><div class="stat"><b id="sScore">0</b><span>score</span></div><div class="stat"><b id="sLives">🛡️🛡️🛡️</b><span>shields</span></div></div>${quit}`;
-  if(m==='practice')top=`<div class="fh">🌿 Practise</div><div class="stats3"><div class="stat"><b id="sDone">0/20</b><span>done</span></div><div class="stat"><b id="sStreak">0</b><span>streak</span></div></div>${quit}`;
+  if(m==='rush')top=`<div class="fh">🦖 Raptor Rush${opTag}</div><div class="stats3"><div class="stat"><b id="sScore">0</b><span>score</span></div><div class="stat"><b id="sTime">60</b><span>seconds</span></div><div class="stat"><b id="sMult">x1</b><span>bucks</span></div></div>${quit}`;
+  if(m==='storm')top=`<div class="fh">🌪️ Storm Circle${opTag}</div><div class="stats3"><div class="stat"><b id="sScore">0</b><span>score</span></div><div class="stat"><b id="sLives">🛡️🛡️🛡️</b><span>shields</span></div></div>${quit}`;
+  if(m==='practice')top=`<div class="fh">🌿 Practise${opTag}</div><div class="stats3"><div class="stat"><b id="sDone">0/20</b><span>done</span></div><div class="stat"><b id="sStreak">0</b><span>streak</span></div></div>${quit}`;
   if(m==='battle'){const B=BOSSES[G.boss];
     top=`<div class="fh">⚔️ vs ${B.name}</div>${quit}`;
     arena=`<div class="arena"><div class="fighter"><div class="rexbox" id="meRex">${rexSVG(mySkin())}</div><div class="hearts" id="sHearts"></div><b>${esc(S.name)}</b></div>
@@ -745,7 +911,7 @@ function say(html,mood){const b=$('#gBubble');if(b)b.innerHTML=html;const r=$('#
 function nextQ(){
   if(!G||G.over)return;
   G.q=G.picker.next();G.qStart=performance.now();G.locked=false;G.lastTickSec=null;
-  $('#qText').textContent=`${G.q.a} × ${G.q.b}`;
+  $('#qText').textContent=qLabel(G.q);
   const inp=$('#ansIn');inp.value='';inp.className='answer';inp.focus();
 }
 function tick(){
@@ -763,20 +929,21 @@ function submit(){
   if(!G||G.over||G.locked)return;
   const inp=$('#ansIn'),v=inp.value.trim();if(v==='')return;
   const n=parseInt(v,10);if(isNaN(n)){inp.value='';return}
-  const {a,b}=G.q;
+  const q=G.q;
   if(G.retype){
-    if(n===a*b){G.retype=false;SFX.good();G.done++;updateHud();$('#fb').innerHTML='<span class="good">👍 That\'s the one. Locked in your brain now!</span>';say(fill(pick(['There you go, {name}! That fossil is dug up. 🦴','Now you know it! I\'ll ask again in a bit, just to check.'])),'happy');G.locked=true;later(()=>G.done>=G.total?endGame():nextQ(),700)}
+    if(n===qAnswer(q)){G.retype=false;SFX.good();G.done++;updateHud();$('#fb').innerHTML='<span class="good">👍 That\'s the one. Locked in your brain now!</span>';say(fill(pick(['There you go, {name}! That fossil is dug up. 🦴','Now you know it! I\'ll ask again in a bit, just to check.'])),'happy');G.locked=true;later(()=>G.done>=G.total?endGame():nextQ(),700)}
     else{anim(inp,'shake');inp.value='';SFX.bad()}
     return;
   }
   const ms=performance.now()-G.qStart;
-  n===a*b?right(ms):wrong(n,false);
+  n===qAnswer(q)?right(ms):wrong(n,false);
 }
 function right(ms){
-  const {a,b}=G.q,inp=$('#ansIn');
-  recordFact(a,b,true,ms);G.correct++;G.ms+=ms;G.streak++;G.bestStreak=Math.max(G.bestStreak,G.streak);
+  const q=G.q,{a,b}=q,inp=$('#ansIn');
+  recordFact(a,b,true,ms,q.op);G.correct++;if(q.op==='div')G.divC++;
+  G.ms+=ms;G.streak++;G.bestStreak=Math.max(G.bestStreak,G.streak);
   SFX.good();inp.classList.add('good');burst(inp,(FXS.find(f=>f.id===S.equip.fx)||FXS[0]).e);
-  let fb=`<span class="good">✔ ${a} × ${b} = ${a*b}</span>`;
+  let fb=`<span class="good">✔ ${qFull(q)}</span>`;
   if(G.mode==='rush'){const m=mult();G.bucks+=m;floatText(inp,'+'+m+'🪙','#ffd54f')}
   if(G.mode==='storm'){G.bucks+=2;G.limit=Math.max(3,G.limit-.3)}
   if(G.mode==='practice'){G.bucks+=1;G.done++}
@@ -796,17 +963,18 @@ function right(ms){
   nextQ();
 }
 function wrong(n,timeout){
-  const {a,b}=G.q,inp=$('#ansIn');
-  recordFact(a,b,false,0);G.wrong++;G.streak=0;G.picker.retry(a,b);
+  const q=G.q,{a,b}=q,inp=$('#ansIn');
+  recordFact(a,b,false,0,q.op);G.wrong++;if(q.op==='div')G.divW++;
+  G.streak=0;G.picker.retry(a,b,q.op);
   SFX.bad();inp.classList.add('bad');anim(inp,'shake');
   const fb=$('#fb');
   if(G.mode==='practice'){
     G.retype=true;inp.value='';inp.classList.remove('bad');
-    fb.innerHTML=`<span class="bad">Not quite!</span><div class="hint">💡 ${hintFor(a,b)}<br>Now type <b>${a*b}</b> to carry on.</div>`;
+    fb.innerHTML=`<span class="bad">Not quite!</span><div class="hint">💡 ${hintForQ(q)}<br>Now type <b>${qAnswer(q)}</b> to carry on.</div>`;
     say(fill(pick(Q_BAD)),'sad');return;
   }
   G.locked=true;
-  fb.innerHTML=`<span class="bad">${timeout?'⏰ Too slow! ':'✘ '}${a} × ${b} = <b>${a*b}</b></span>`;
+  fb.innerHTML=`<span class="bad">${timeout?'⏰ Too slow! ':'✘ '}${qFullB(q)}</span>`;
   if(G.mode==='rush'){say(fill(pick(Q_BAD)),'sad');updateHud();return later(nextQ,900)}
   if(G.mode==='storm'){
     G.lives--;updateHud();say(timeout?fill(pick(['The storm got you! Rotate, {name}, ROTATE!','Too slow! Even I\'m faster than that, and I have tiny legs too. Wait, no, my legs are huge.'])):fill(pick(Q_BAD)),'sad');
@@ -851,7 +1019,15 @@ function endGame(){
   const total=lines.reduce((s,l)=>s+l[1],0);
   S.bucks+=total;S.earned+=total;
   const T=S.totals;T.correct+=g.correct;T.wrong+=g.wrong;T.rounds++;T.secs+=secs;T.bestStreak=Math.max(T.bestStreak,g.bestStreak);
-  S.sessions.push({d:Date.now(),m,c:g.correct,w:g.wrong,s:secs,t:m==='battle'?'Boss '+(g.boss+1):g.tables.length===11?'All':g.tables.join(','),won:m==='battle'?!!g.won:undefined});
+  T.divCorrect=(T.divCorrect||0)+g.divC;T.divWrong=(T.divWrong||0)+g.divW;
+  // egg meter: one egg for every EGG_EVERY correct answers, in any mode
+  let eggsWon=0;
+  if(g.correct>0){
+    S.eggProgress=(S.eggProgress||0)+g.correct;
+    while(S.eggProgress>=EGG_EVERY){S.eggProgress-=EGG_EVERY;S.eggs=(S.eggs||0)+1;eggsWon++}
+  }
+  const opTag=g.op==='div'?' ÷':g.op==='mix'?' ×÷':'';
+  S.sessions.push({d:Date.now(),m,c:g.correct,w:g.wrong,s:secs,t:(m==='battle'?'Boss '+(g.boss+1):g.tables.length===11?'All':g.tables.join(','))+opTag,won:m==='battle'?!!g.won:undefined});
   if(S.sessions.length>300)S.sessions=S.sessions.slice(-300);
 
   // badges
@@ -866,6 +1042,8 @@ function endGame(){
   if(S.daily.count>=3)award('daily3');if(S.daily.count>=7)award('daily7');
   if(T.correct>=100)award('c100');if(T.correct>=1000)award('c1000');
   if(T.practice>=5)award('practice5');
+  if(T.divCorrect>=50)award('div50');if(T.divCorrect>=250)award('div250');
+  if(TABLES.some(t=>tableMastered(t,'div')))award('divTamer');
   const unlocked=syncUnlocks();
   const rankAfter=rankOf(S.earned);
   save();
@@ -895,8 +1073,11 @@ function endGame(){
     ${rankAfter>rankBefore?`<div class="hint">⬆️ RANK UP! You're now a <b>${RANKS[rankAfter][2]} ${RANKS[rankAfter][1]}</b>!</div>`:''}
     ${newB.map(b=>`<div class="hint">🏅 New badge: <b>${b.ic} ${b.name}</b>: ${b.desc}</div>`).join('')}
     ${unlocked.map(it=>`<div class="hint">🎉 UNLOCKED: <b>${it.name}</b>! Go to the Shop to equip it.</div>`).join('')}
+    ${eggsWon?`<div class="hint">🥚 You found <b>${eggsWon} egg${eggsWon>1?'s':''}</b>! Take ${eggsWon>1?'them':'it'} to the Nest and see what hatches.</div>`:''}
+    <div class="emeter" style="max-width:420px;margin:12px auto 0"><div class="bar egg"><i style="width:${Math.round((S.eggProgress||0)/EGG_EVERY*100)}%"></i></div><span class="muted">${EGG_EVERY-(S.eggProgress||0)} more correct → 🥚</span></div>
     <div class="row" style="justify-content:center;margin-top:16px">
       <button class="btn green" data-act="again">🔁 Play again</button>
+      ${S.eggs?`<button class="btn" data-act="nest">🥚 Hatch (${S.eggs})</button>`:''}
       ${m==='battle'&&g.won&&g.boss<4?`<button class="btn red" data-act="fight" data-arg="${g.boss+1}">⚔️ Next boss</button>`:''}
       <button class="btn purple" data-act="shop">🛒 Shop</button>
       <button class="btn grey" data-act="home">🏠 Home</button>
@@ -909,7 +1090,9 @@ let lastGame=null;
 
 /* ---------------- SHOP ---------------- */
 let shopTab='skin';
+const shopTabs=()=>`<div class="tabs">${[['skin','🦖 Skins'],['bg','🏞️ Backgrounds'],['fx','✨ Effects'],['egg','🥚 Nest']].map(([k,l])=>`<button class="btn small ${shopTab===k?'active':'grey'}" data-act="shopTab" data-arg="${k}">${l}</button>`).join('')}</div>`;
 function screenShop(){
+  if(shopTab==='egg')return screenNest();
   const list=shopTab==='skin'?SKINS:shopTab==='bg'?BGS:FXS;
   const cards=list.map(it=>{
     const own=owns(shopTab,it.id),eq=S.equip[shopTab]===it.id;
@@ -923,7 +1106,7 @@ function screenShop(){
   }).join('');
   show(`<div class="panel"><h1>🛒 Dino Shop</h1>
     <p>You have <span class="price">🪙 ${S.bucks} Dino Bucks</span>. Some items can't be bought: you have to <b>earn</b> them. 😏</p>
-    <div class="tabs">${[['skin','🦖 Skins'],['bg','🏞️ Backgrounds'],['fx','✨ Effects']].map(([k,l])=>`<button class="btn small ${shopTab===k?'active':'grey'}" data-act="shopTab" data-arg="${k}">${l}</button>`).join('')}</div>
+    ${shopTabs()}
     <div class="grid3">${cards}</div>
     <div style="margin-top:14px"><button class="btn grey small" data-act="home">⬅ Back</button></div></div>`);
 }
@@ -937,18 +1120,105 @@ function buy(id){
   save();if(shopTab==='bg')applyBg();screenShop();
 }
 
+/* ---------------- THE NEST (eggs) ---------------- */
+let hatchTok=0;
+function screenNest(){
+  shopTab='egg';
+  const got=eggSkinsOwned(),tot=EGG_SKINS.length;
+  const left=EGG_EVERY-(S.eggProgress||0);
+  const pityLeft=Math.max(0,EGG_PITY-(S.eggPity||0));
+  const cards=EGG_SKINS.map(it=>{
+    const have=owns('skin',it.id),eq=S.equip.skin===it.id;
+    return `<div class="card rar-${it.rarity} ${have?'':'unknown'} ${eq?'equipped':''}">
+      <div class="thumb">${rexSVG(it)}</div>
+      <b>${have?it.name:'? ? ?'}</b>${rarChip(it.rarity)}
+      ${have?(eq?'<button class="btn small gold" disabled>✓ Equipped</button>':`<button class="btn small green" data-act="equipSkin" data-arg="${it.id}">Equip</button>`)
+            :'<span class="muted" style="font-size:13px">Still in its egg</span>'}</div>`;
+  }).join('');
+  show(`<div class="panel"><h1>🥚 The Nest</h1>
+    ${shopTabs()}
+    <div class="hero" style="margin-bottom:10px">${rexBox(S.eggs?'roar':'happy','sm')}<div class="bubble">${
+      S.eggs?`You've got <b>${S.eggs} egg${S.eggs>1?'s':''}</b>! I'd open ${S.eggs>1?'them':'it'} for you but, well. <i>*waggles tiny arms*</i>`
+            :`Every <b>${EGG_EVERY}</b> correct answers earns you an egg. ${left} more to go — get practising!`}</div></div>
+    <div class="emeter"><div class="bar egg"><i style="width:${Math.round((S.eggProgress||0)/EGG_EVERY*100)}%"></i></div><span class="muted">${left} more correct → 🥚</span></div>
+    ${S.eggs?`<div class="center" style="margin:14px 0"><div class="eggbox" style="margin:0 auto 10px">${eggSVG('common','idle')}</div>
+      <button class="btn gold huge" data-act="hatch">🥚 Hatch an egg (${S.eggs} left)</button></div>`:''}
+    <p class="center"><b>${got} of ${tot}</b> egg skins collected.</p>
+    <p class="muted center" style="font-size:14px">Chances per egg: ${TIERS.map(t=>`${rarChip(t)} ${RARITY[t].pct}%`).join(' &nbsp; ')}<br>
+      You never get the same skin twice, and if you go <b>${EGG_PITY}</b> eggs without an Epic or Legendary the next one is guaranteed to be one${pityLeft<=4&&pityLeft>0?` — only <b>${pityLeft}</b> to go!`:'.'}</p>
+    <div class="grid3" style="margin-top:14px">${cards}</div>
+    <div style="margin-top:14px"><button class="btn grey small" data-act="home">⬅ Back</button></div></div>`);
+}
+function hatchEgg(){
+  if(!S.eggs)return screenNest();
+  S.eggs--;S.eggsOpened=(S.eggsOpened||0)+1;
+  const res=rollEgg();save();
+  const tok=++hatchTok,step=(ms,fn)=>setTimeout(()=>{if(tok===hatchTok)fn()},ms);
+  show(`<div class="panel center"><h1>🥚 Something's moving…</h1>
+    <div class="eggbox big" id="eggAnim">${eggSVG(res.rarity)}</div>
+    <p class="muted">Shhh. Wait for it…</p></div>`);
+  SFX.tick();
+  step(250,()=>{anim($('#eggAnim'),'wobble');SFX.tick()});
+  step(950,()=>{anim($('#eggAnim'),'wobble');SFX.tick()});
+  step(1650,()=>{anim($('#eggAnim'),'crack');SFX.hit()});
+  step(2300,()=>eggReveal(res));
+}
+const EGG_FLAVOUR={
+  common:['A fine little dino. Every nest needs one.','Not rare, but definitely yours.','Solid. Dependable. Slightly damp.'],
+  rare:['Ooh, a RARE one! Nice going.','You don\'t see one of these every day.','That\'s a proper find, that is.'],
+  epic:['EPIC! I nearly dropped my egg. If I could hold things.','Wow. WOW. Look at it!','That is an extremely fancy dinosaur.'],
+  legendary:['LEGENDARY!!! Do you know how rare that is?! THREE PERCENT!','I have never seen one. Not once. And I live here.','Frame it. Put it on a stamp. Tell your teacher.']
+};
+function eggReveal(res){
+  const R=RARITY[res.rarity];
+  if(res.complete){
+    S.bucks+=res.bucks;S.earned+=res.bucks;save();
+    show(`<div class="panel center"><h1>🌟 A golden egg!</h1>
+      <div class="eggbox big reveal">${eggSVG('legendary')}</div>
+      <p>You've already collected <b>every single</b> egg skin, you magnificent creature.</p>
+      <p class="price">+${res.bucks} 🪙 Dino Bucks instead!</p>
+      <div class="row" style="justify-content:center;margin-top:14px">
+        ${S.eggs?`<button class="btn gold" data-act="hatch">🥚 Hatch another (${S.eggs})</button>`:''}
+        <button class="btn grey" data-act="nest">⬅ Back to the Nest</button></div></div>`);
+    confetti(120);SFX.win();return;
+  }
+  const sk=res.skin,big=res.rarity==='epic'||res.rarity==='legendary';
+  awardNow('hatch1');
+  if((S.eggsOpened||0)>=10)awardNow('hatch10');
+  if(res.rarity==='legendary')awardNow('legend1');
+  if(eggSkinsOwned()===EGG_SKINS.length)awardNow('eggAll');
+  save();
+  show(`<div class="panel center">
+    <h1>${big?'✨ ':''}${R.name}!${big?' ✨':''}</h1>
+    <div class="rexbox reveal" id="hatched" style="width:240px;margin:0 auto">${rexSVG(sk,{mood:'roar'})}</div>
+    <h2 style="margin:10px 0 4px">${sk.name}</h2>
+    <p>${rarChip(res.rarity)}</p>
+    <p class="muted">${pick(EGG_FLAVOUR[res.rarity])}</p>
+    <div class="row" style="justify-content:center;margin-top:14px">
+      <button class="btn green" data-act="equipSkin" data-arg="${sk.id}">🦖 Wear it now</button>
+      ${S.eggs?`<button class="btn gold" data-act="hatch">🥚 Hatch another (${S.eggs})</button>`:''}
+      <button class="btn grey" data-act="nest">⬅ Back to the Nest</button>
+    </div></div>`);
+  burst($('#hatched'),res.rarity==='legendary'?['🌈','⭐','💎']:res.rarity==='epic'?['✨','💫','🌟']:['🥚','🐣','✨']);
+  if(big){confetti(res.rarity==='legendary'?170:90);SFX.win()}else SFX.coin();
+}
+
 /* ---------------- FOSSIL MAP / BADGES / STATS / SETTINGS ---------------- */
+let mapOp='mul';
 function screenMap(){
-  let cells='<div class="hd">×</div>'+TABLES.map(t=>`<div class="hd">${t}</div>`).join('');
-  for(const a of TABLES){cells+=`<div class="hd rowh" data-act="practiseOne" data-arg="${a}" title="Practise the ${a}× table">${a}</div>`;
-    for(const b of TABLES){const lv=factLevel(a,b);cells+=`<div class="lv-${lv}" title="${a} × ${b}">${lv==='new'?'?':a*b}</div>`}}
+  const div=mapOp==='div',sym=div?'÷':'×';
+  let cells=`<div class="hd">${sym}</div>`+TABLES.map(t=>`<div class="hd">${t}</div>`).join('');
+  for(const a of TABLES){cells+=`<div class="hd rowh" data-act="practiseOne" data-arg="${a}" data-op="${mapOp}" title="${div?`Practise dividing by ${a}`:`Practise the ${a}× table`}">${a}</div>`;
+    for(const b of TABLES){const lv=factLevel(a,b,mapOp);
+      cells+=`<div class="lv-${lv}" title="${div?`${a*b} ÷ ${a}`:`${a} × ${b}`}">${lv==='new'?'?':a*b}</div>`}}
   const keys=[];for(const a of TABLES)for(const b of TABLES)if(a<=b)keys.push(fkey(a,b));
-  const cnt=lv=>keys.filter(k=>{const[a,b]=k.split('x').map(Number);return factLevel(a,b)===lv}).length;
+  const cnt=lv=>keys.filter(k=>{const[a,b]=k.split('x').map(Number);return factLevel(a,b,mapOp)===lv}).length;
   show(`<div class="panel"><h1>🗺️ Fossil Map</h1>
-    <p>Every times-table fact is a fossil waiting to be dug up. Turn the whole map <b>green</b> to become a Dino Legend! Tap a row number to practise that table.</p>
+    <div class="opick">${[['mul','× times tables'],['div','÷ division']].map(([k,l])=>`<button class="obtn ${mapOp===k?'on':''}" data-act="mapOp" data-arg="${k}" style="font-size:17px">${l}</button>`).join('')}</div>
+    <p>${div?'The same fossils, dug up the other way round. Division is tracked <b>separately</b>, so this map starts empty even if your × map is already green.':'Every times-table fact is a fossil waiting to be dug up. Turn the whole map <b>green</b> to become a Dino Legend!'} Tap a row number to practise that table.</p>
     <div class="legend"><span><i class="lv-gold"></i>Mastered (${cnt('gold')})</span><span><i class="lv-ok"></i>Getting there (${cnt('ok')})</span><span><i class="lv-bad"></i>Needs work (${cnt('bad')})</span><span><i class="lv-new"></i>Not dug up yet (${cnt('new')})</span></div>
     <div class="fmap">${cells}</div>
-    <p class="muted center" style="font-size:14px;margin-top:10px">7 × 8 and 8 × 7 count as the same fossil. Facts turn green when you get them right <b>quickly</b>, several times.</p>
+    <p class="muted center" style="font-size:14px;margin-top:10px">${div?'Each square shows the number being divided: 56 covers both 56 ÷ 7 and 56 ÷ 8.':'7 × 8 and 8 × 7 count as the same fossil.'} Facts turn green when you get them right <b>quickly</b>, several times.</p>
     <div style="margin-top:10px"><button class="btn grey small" data-act="home">⬅ Back</button></div></div>`);
 }
 function screenBadges(){
@@ -960,7 +1230,13 @@ function screenBadges(){
 function screenStats(){
   const T=S.totals,acc=T.correct+T.wrong?Math.round(T.correct/(T.correct+T.wrong)*100):0;
   const mins=Math.round(T.secs/60),days=new Set(S.sessions.map(s=>todayStr(new Date(s.d)))).size;
-  const tricky=Object.entries(S.facts).filter(([,f])=>f.n>=2).sort((x,y)=>x[1].s-y[1].s||(y[1].n-y[1].c)-(x[1].n-x[1].c)).slice(0,8);
+  const rows=[];
+  for(const [k,f] of Object.entries(S.facts)){
+    if(f.n>=2)rows.push({k,op:'mul',s:f.s,c:f.c,n:f.n,ms:f.ms});
+    if(f.dn>=2)rows.push({k,op:'div',s:f.ds||0,c:f.dc||0,n:f.dn,ms:f.dms||0});
+  }
+  const tricky=rows.sort((x,y)=>x.s-y.s||(y.n-y.c)-(x.n-x.c)).slice(0,8);
+  const divOn=anyDivision();
   const mName={rush:'Raptor Rush',storm:'Storm Circle',battle:'Dino Battle',practice:'Practise'};
   show(`<div class="panel"><h1>📊 Stats</h1><p class="muted">For ${esc(S.name)} (and any curious grown-ups).</p>
     <div class="stats3" style="justify-content:flex-start">
@@ -974,11 +1250,16 @@ function screenStats(){
       <div class="stat"><b>${S.best.storm}</b><span>best Storm Circle</span></div>
       <div class="stat"><b>${S.bossLevel}/5</b><span>bosses beaten</span></div>
       <div class="stat"><b>${T.bestStreak}</b><span>best streak</span></div>
+      ${divOn?`<div class="stat"><b>${T.divCorrect||0}</b><span>division correct</span></div>`:''}
     </div></div>
   <div class="panel"><h2>Table mastery</h2>
-    ${TABLES.map(t=>{const p=tablePct(t);return `<div class="mrow"><b>${t}×</b><div class="bar ${p>=100?'green':''}"><i style="width:${p}%"></i></div><span>${p}%${p>=100?' ✅':''}</span></div>`}).join('')}</div>
+    ${TABLES.map(t=>{const p=tablePct(t);return `<div class="mrow"><b>${t}×</b><div class="bar ${p>=100?'green':''}"><i style="width:${p}%"></i></div><span>${p}%${p>=100?' ✅':''}</span></div>`}).join('')}
+    ${divOn?`<h2 style="margin-top:18px">Division mastery</h2>
+    ${TABLES.map(t=>{const p=tablePct(t,'div');return `<div class="mrow"><b>÷${t}</b><div class="bar ${p>=100?'green':''}"><i style="width:${p}%"></i></div><span>${p}%${p>=100?' ✅':''}</span></div>`}).join('')}`:''}</div>
   <div class="panel"><h2>Trickiest facts</h2>
-    ${tricky.length?`<table class="tbl"><tr><th>Fact</th><th>Right</th><th>Wrong</th><th>Avg time</th></tr>${tricky.map(([k,f])=>{const[a,b]=k.split('x');return `<tr><td><b>${a} × ${b} = ${a*b}</b></td><td>${f.c}</td><td>${f.n-f.c}</td><td>${f.c?(f.ms/f.c/1000).toFixed(1)+'s':'–'}</td></tr>`}).join('')}</table>`:'<p class="muted">Play a few rounds and the tricky ones will show up here.</p>'}</div>
+    ${tricky.length?`<table class="tbl"><tr><th>Fact</th><th>Right</th><th>Wrong</th><th>Avg time</th></tr>${tricky.map(f=>{const[a,b]=f.k.split('x').map(Number);
+      const lab=f.op==='div'?`${a*b} ÷ ${a} = ${b}`:`${a} × ${b} = ${a*b}`;
+      return `<tr><td><b>${lab}</b></td><td>${f.c}</td><td>${f.n-f.c}</td><td>${f.c?(f.ms/f.c/1000).toFixed(1)+'s':'–'}</td></tr>`}).join('')}</table>`:'<p class="muted">Play a few rounds and the tricky ones will show up here.</p>'}</div>
   <div class="panel"><h2>Recent rounds</h2>
     ${S.sessions.length?`<table class="tbl"><tr><th>When</th><th>Mode</th><th>Tables</th><th>✔</th><th>✘</th><th>Time</th></tr>${S.sessions.slice(-12).reverse().map(s=>`<tr><td>${new Date(s.d).toLocaleDateString(undefined,{day:'numeric',month:'short'})} ${new Date(s.d).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'})}</td><td>${mName[s.m]}${s.won===true?' 🏆':''}</td><td>${s.t}</td><td>${s.c}</td><td>${s.w}</td><td>${Math.floor(s.s/60)}:${String(s.s%60).padStart(2,'0')}</td></tr>`).join('')}</table>`:'<p class="muted">No rounds yet!</p>'}
     <p class="muted" style="font-size:14px;margin-top:10px">Progress is stored in this web browser on this computer. Back it up with a save code in ⚙️ Settings.</p>
@@ -1017,11 +1298,17 @@ const ACT={
   tAll:()=>{pickTables=new Set(TABLES);drawTables()},
   tNone:()=>{pickTables=new Set();drawTables()},
   tWeak:()=>{pickTables=new Set([...TABLES].sort((x,y)=>tablePct(x)-tablePct(y)||Math.random()-.5).slice(0,3));drawTables();toast('🎯 Rex picked your 3 trickiest tables. Mwahaha.')},
-  go:()=>{if(pickTables.size)startGame(pickMode,{tables:[...pickTables].sort((a,b)=>a-b)})},
-  practiseOne:(el)=>startGame('practice',{tables:[+el.dataset.arg]}),
+  go:()=>{if(pickTables.size)startGame(pickMode,{tables:[...pickTables].sort((a,b)=>a-b),op:pickOp})},
+  practiseOne:(el)=>startGame('practice',{tables:[+el.dataset.arg],op:el.dataset.op||'mul'}),
+  oSet:(el)=>{pickOp=el.dataset.arg;drawOps();drawTables()},
+  mapOp:(el)=>{mapOp=el.dataset.arg;screenMap()},
+  nest:()=>screenNest(),
+  hatch:()=>hatchEgg(),
+  equipSkin:(el)=>{const id=el.dataset.arg;if(!owns('skin',id))return;S.equip.skin=id;save();SFX.coin();screenNest()},
   fight:(el)=>{const i=+el.dataset.arg;if(i>S.bossLevel)return;stopGame();const B=BOSSES[i];
     show(`<div class="panel center"><h1>⚔️ ${B.name}</h1><div class="rexbox" style="width:220px;margin:0 auto">${rexSVG(B,{mood:'roar',flip:true})}</div>
       <div class="bubble" style="margin:14px 0">"${B.taunt}"</div><p>Tables: <b>${B.tables.length>5?'ALL of them!':B.tables.map(t=>t+'×').join(', ')}</b> · Boss attacks every <b>${B.atk}s</b> you don't answer.</p>
+      ${B.op==='mix'?'<p class="hint">⚠️ This one mixes in <b>division</b> questions too. Watch out!</p>':''}
       <button class="btn red huge" data-act="fightGo" data-arg="${i}">FIGHT! ⚔️</button><div style="margin-top:10px"><button class="btn grey small" data-act="bosses">⬅ Back</button></div></div>`);SFX.roar()},
   fightGo:(el)=>startGame('battle',{boss:+el.dataset.arg}),
   quit:()=>{if(G&&(G.correct||G.wrong)&&!confirm('Quit this round? You\'ll still keep the Dino Bucks you\'ve earned.'))return;if(G&&(G.correct||G.wrong)){G.quit=true;endGame()}else screenHome()},
